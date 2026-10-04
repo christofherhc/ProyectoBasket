@@ -97,7 +97,7 @@ Contiene **TODO** el código PHP de negocio. Fuera de `public/` por seguridad (n
 
 **Propósito:** Centralizar configuración.
 
-- `config.php` → Define constantes globales: `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_CHARSET`, `BASE_URL`. Evita valores "hardcodeados" dispersos.
+- `config.php` → Define constantes globales: `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_CHARSET`, `BASE_URL`. Evita valores fijos dispersos.
 
 ### `app/core/`
 

@@ -103,7 +103,7 @@ require_once '../app/core/Model.php';
 
 class Usuario extends Model {
     protected string $tabla = 'usuarios';
-    
+
     public function buscarPorEmail(string $email): ?array {
         $sql = "SELECT * FROM {$this->tabla} WHERE email = :email LIMIT 1";
         $stmt = $this->db->prepare($sql);
@@ -112,7 +112,7 @@ class Usuario extends Model {
         $resultado = $stmt->fetch();
         return $resultado === false ? null : $resultado;
     }
-    
+
     public function crear(string $nombre, string $email, string $passwordHash): bool {
         $sql = "INSERT INTO {$this->tabla} (nombre, email, password) VALUES (:nombre, :email, :password)";
         $stmt = $this->db->prepare($sql);
@@ -121,7 +121,7 @@ class Usuario extends Model {
         $stmt->bindValue(':password', $passwordHash, PDO::PARAM_STR);
         return $stmt->execute();
     }
-    
+
     public function existeEmail(string $email): bool {
         $usuario = $this->buscarPorEmail($email);
         return $usuario !== null;
@@ -170,39 +170,39 @@ public function login(): void {
         header('Location: ' . BASE_URL . '?controller=Auth&action=index');
         exit;
     }
-    
+
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    
+
     // Validaciones básicas
     if ($email === '' || $password === '') {
         $_SESSION['error'] = 'Email y contraseña son obligatorios';
         header('Location: ' . BASE_URL . '?controller=Auth&action=index');
         exit;
     }
-    
+
     $usuarioModel = new Usuario();
     $usuario = $usuarioModel->buscarPorEmail($email);
-    
+
     if ($usuario === null) {
         $_SESSION['error'] = 'Credenciales incorrectas';
         header('Location: ' . BASE_URL . '?controller=Auth&action=index');
         exit;
     }
-    
+
     // Verificar contraseña
     if (!password_verify($password, $usuario['password'])) {
         $_SESSION['error'] = 'Credenciales incorrectas';
         header('Location: ' . BASE_URL . '?controller=Auth&action=index');
         exit;
     }
-    
+
     // Login exitoso → crear sesión
     $_SESSION['usuario_id'] = $usuario['id'];
     $_SESSION['nombre'] = $usuario['nombre'];
     $_SESSION['email'] = $usuario['email'];
     $_SESSION['logueado'] = true;
-    
+
     header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
     exit;
 }
@@ -239,12 +239,12 @@ public function guardarRegistro(): void {
         header('Location: ' . BASE_URL . '?controller=Auth&action=register');
         exit;
     }
-    
+
     $nombre = trim($_POST['nombre'] ?? '');
     $email  = trim(strtolower($_POST['email'] ?? ''));
     $password = $_POST['password'] ?? '';
     $confirm  = $_POST['confirmar'] ?? '';
-    
+
     // Validaciones
     if ($nombre === '' || $email === '' || $password === '' || $confirm === '') {
         $_SESSION['error'] = 'Todos los campos son obligatorios';
@@ -252,7 +252,7 @@ public function guardarRegistro(): void {
         header('Location: ' . BASE_URL . '?controller=Auth&action=register');
         exit;
     }
-    
+
     // Validar email básico
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $_SESSION['error'] = 'Email no válido';
@@ -260,21 +260,21 @@ public function guardarRegistro(): void {
         header('Location: ' . BASE_URL . '?controller=Auth&action=register');
         exit;
     }
-    
+
     if ($password !== $confirm) {
         $_SESSION['error'] = 'Las contraseñas no coinciden';
         $_SESSION['old'] = ['nombre'=>$nombre, 'email'=>$email];
         header('Location: ' . BASE_URL . '?controller=Auth&action=register');
         exit;
     }
-    
+
     if (strlen($password) < 6) {
         $_SESSION['error'] = 'La contraseña debe tener al menos 6 caracteres';
         $_SESSION['old'] = ['nombre'=>$nombre, 'email'=>$email];
         header('Location: ' . BASE_URL . '?controller=Auth&action=register');
         exit;
     }
-    
+
     $usuarioModel = new Usuario();
     if ($usuarioModel->existeEmail($email)) {
         $_SESSION['error'] = 'El email ya está registrado';
@@ -282,11 +282,11 @@ public function guardarRegistro(): void {
         header('Location: ' . BASE_URL . '?controller=Auth&action=register');
         exit;
     }
-    
+
     // Hashear y crear
     $hash = password_hash($password, PASSWORD_DEFAULT);
     $usuarioModel->crear($nombre, $email, $hash);
-    
+
     $_SESSION['exito'] = 'Registro exitoso. Ahora puedes iniciar sesión';
     header('Location: ' . BASE_URL . '?controller=Auth&action=index');
     exit;
@@ -338,7 +338,7 @@ class Controller {
         extract($datos);
         require_once '../app/views/layouts/main.php';
     }
-    
+
     protected function requiereLogin(): void {
         if (!isset($_SESSION['usuario_id'])) {
             $_SESSION['error'] = 'Debes iniciar sesión para acceder';
@@ -358,12 +358,12 @@ class EquiposController extends Controller {
         $this->requiereLogin();
         // ... resto
     }
-    
+
     public function crear(): void {
         $this->requiereLogin();
         // ...
     }
-    
+
     public function guardar(): void {
         $this->requiereLogin();
         // ...

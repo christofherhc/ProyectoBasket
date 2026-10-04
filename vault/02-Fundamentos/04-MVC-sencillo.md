@@ -126,7 +126,8 @@ Usaremos **variación simple** (no puro estricto, sino práctico para aprender):
 class Model {
     protected PDO $db;
     protected string $tabla;
-    // métodos findAll, findById, create, update, delete...
+    // métodos obtenerTodos(), obtenerPorId(), eliminar(), obtenerUltimoId()
+    // (los modelos añaden crear() y actualizar() con sus propias columnas)
 }
 ```
 Todos modelos heredan: `class Equipo extends Model { ... }`

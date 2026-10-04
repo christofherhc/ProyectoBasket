@@ -289,15 +289,15 @@ Usaremos POO muy básica para Core (Database, Model, Controller). Clases + propi
 class Equipo {
     private ?int $id;
     private string $nombre;
-    
+
     public function getId(): ?int {
         return $this->id;
     }
-    
+
     public function setNombre(string $nombre): void {
         $this->nombre = $nombre;
     }
-    
+
     public function getNombre(): string {
         return $this->nombre;
     }

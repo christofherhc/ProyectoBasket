@@ -1,8 +1,8 @@
 # Día XX - Título del día
 
-**Fecha:** YYYY-MM-DD  
-**Objetivo del día:** Explicación clara y detallada de lo que se busca lograr.  
-**Temas a comprender:** Listado de conceptos que se aprenderán con este procedimiento.  
+**Fecha:** YYYY-MM-DD
+**Objetivo del día:** Explicación clara y detallada de lo que se busca lograr.
+**Temas a comprender:** Listado de conceptos que se aprenderán con este procedimiento.
 **Rama Git sugerida:** `feature/nombre-funcionalidad`
 
 ## 1. Contexto

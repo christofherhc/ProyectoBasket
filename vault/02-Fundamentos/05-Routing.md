@@ -87,35 +87,35 @@ class Router {
     public function __construct() {
         // 1. Obtener parámetros de URL
         $this->parseUrl();
-        
+
         // 2. Cargar controlador
         $this->loadController();
-        
+
         // 3. Ejecutar acción
         $this->executeAction();
     }
-    
+
     private function parseUrl(): void {
         // Controller
         if (isset($_GET['controller']) && !empty($_GET['controller'])) {
             $this->controller = ucfirst(strtolower($_GET['controller']));
         }
-        
+
         // Action
         if (isset($_GET['action']) && !empty($_GET['action'])) {
             $this->action = strtolower($_GET['action']);
         }
-        
+
         // Parámetros extra (id, etc.)
         $this->params = $_GET;
         // Eliminamos controller y action para dejar solo params útiles
         unset($this->params['controller'], $this->params['action']);
     }
-    
+
     private function loadController(): void {
         $nombreClase = $this->controller . 'Controller';
         $rutaControlador = '../app/controllers/' . $nombreClase . '.php';
-        
+
         if (file_exists($rutaControlador)) {
             require_once $rutaControlador;
             // Verificar que clase existe
@@ -131,7 +131,7 @@ class Router {
             die("Error: No se encontró el controlador $rutaControlador");
         }
     }
-    
+
     private function executeAction(): void {
         if (method_exists($this->controllerObjeto, $this->action)) {
             // Llamamos método con parámetros
@@ -259,14 +259,14 @@ class EquiposController extends Controller {
         $id = isset($params['id']) ? (int)$params['id'] : 0;
         // o
         $id = (int)($params['id'] ?? 0);
-        
+
         $equipo = (new Equipo())->obtenerPorId($id);
         if (!$equipo) {
             // Redirigir o mostrar error
         }
         $this->view('equipos/editar', ['equipo' => $equipo]);
     }
-    
+
     public function eliminar(array $params): void {
         $id = (int)($params['id'] ?? 0);
         (new Equipo())->eliminar($id);

@@ -70,9 +70,9 @@ Usaremos ejemplo real: `?controller=Equipos&action=index`
   - controller = "Equipos" → `ucfirst(strtolower) = "Equipos"`
   - action = "index" → `"index"`
   - params = `[]` (sin id)
-- `loadController()`: 
+- `loadController()`:
   - nombreClase = `EquiposController`
-  - ruta = `../app/controllers/EquiposController.php`
+  - ruta = `../../app/controllers/EquiposController.php`
   - `require_once` + `new EquiposController()`
 - `executeAction()`:
   - Verifica `method_exists(EquiposController, 'index')`
@@ -212,7 +212,7 @@ public function guardar(): void {
 ### PASO 4: Modelo crea registro
 
 ```php
-public function crear(string $nombre, string $ciudad): bool {
+public function crear(string $nombre, string $ciudad, ?int $fundacion = null): bool {
     $sql = "INSERT INTO equipos (nombre, ciudad) VALUES (:nombre, :ciudad)";
     $stmt = $this->db->prepare($sql);
     $stmt->bindValue(':nombre', $nombre, PDO::PARAM_STR);
@@ -282,10 +282,10 @@ public function obtenerPorId(int $id): ?array {
 ## 8. Diagrama Simplificado "Mental"
 
 ```
-URL GET/POST → [index.php] → [Router] 
-  → instancia [Controller] → llama [Model] 
-    → [Database] → [MySQL] 
-  ← devuelve datos ← 
+URL GET/POST → [index.php] → [Router]
+  → instancia [Controller] → llama [Model]
+    → [Database] → [MySQL]
+  ← devuelve datos ←
 [Controller] → carga [View]+[Layout] → genera HTML → Navegador
 ```
 

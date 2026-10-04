@@ -91,9 +91,9 @@ Creamos clase singleton para **una sola conexión** durante la petición.
 
 class Database {
     private static ?PDO $instancia = null;
-    
+
     private function __construct() {}
-    
+
     public static function getConexion(): PDO {
         if (self::$instancia === null) {
             try {
@@ -112,10 +112,10 @@ class Database {
         }
         return self::$instancia;
     }
-    
+
     // Evitar clonación
     private function __clone() {}
-    
+
     // Evitar deserialización
     public function __wakeup() {
         throw new Exception("No se puede deserializar singleton");

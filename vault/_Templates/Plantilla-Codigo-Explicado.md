@@ -1,8 +1,8 @@
 # Explicación detallada: [Nombre del Archivo]
 
-**Archivo:** `ruta/completa/archivo.php`  
-**Tipo:** Modelo/Controlador/Core/Vista  
-**Responsabilidad:** Explicación clara de qué responsabilidad cumple en MVC.  
+**Archivo:** `ruta/completa/archivo.php`
+**Tipo:** Modelo/Controlador/Core/Vista
+**Responsabilidad:** Explicación clara de qué responsabilidad cumple en MVC.
 **Fecha de análisis:** YYYY-MM-DD
 
 ## 1. Propósito general
