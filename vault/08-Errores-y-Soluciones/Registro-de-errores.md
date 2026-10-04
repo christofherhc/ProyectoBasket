@@ -23,6 +23,12 @@ Todos los errores reales que aparecieron al construir y verificar este proyecto.
 | [13](#13-rutas-relativas-al-cargar-el-layout) | `Failed to open stream` | Medio |
 | [14](#14-las-pruebas-daban-fallos-pero-la-aplicación-sí-funcionaba) | Falsos negativos en las pruebas | Interesante |
 | [15](#15-la-base-de-datos-de-la-última-verificación-quedó-con-datos-de-prueba) | Datos sucios entre ejecuciones | Interesante |
+| [16](#16-el-borrado-de-un-equipo-con-jugadores-daba-pantalla-en-blanco) | Borrar equipo con jugadores o partidos | Crítico |
+| [17](#17-el-router-reflejaba-html-en-el-mensaje-de-error) | XSS reflejado en `?controller=` | Crítico |
+| [18](#18-la-redirección-usaba-el-header-host) | `Location:` con host ajeno | Alto |
+| [19](#19-los-campos-enviados-como-array-provocaban-500) | `nombre[]=x` -> HTTP 500 | Alto |
+| [20](#20-los-datos-inválidos-provocaban-500) | Exceso de longitud, fecha o FK inválida | Alto |
+| [21](#21-la-base-no-restringía-posiciones-ni-dorsales) | `posicion=ADMIN` y dorsales duplicados | Medio |
 
 ---
 
@@ -440,6 +446,142 @@ y ejecutar la suite completa después. Así el resultado es idéntico en la segu
 
 ---
 
+## 16. El borrado de un equipo con jugadores daba pantalla en blanco
+
+**Error:** al pulsar "Eliminar" en un equipo con jugadores o partidos, el navegador muestra una página vacía (HTTP 500).
+
+**Causa:** `equipos.id` tiene `ON DELETE RESTRICT`. El `DELETE` viola la clave foránea y MariaDB responde con el error 1451. `Database` configura `PDO::ERRMODE_EXCEPTION`, así que la excepción sube hasta `index.php`, que **no tiene ningún `try/catch`**. Resultado: los datos están a salvo, pero el usuario no ve ningún mensaje.
+
+```text
+SQLSTATE[23000]: Integrity constraint violation: 1451 Cannot delete or update a parent row
+```
+
+**Solución (pendiente de aplicar):** envolver la llamada en `try/catch` y comprobar el código 1451, o avisar antes:
+
+```php
+try {
+    $ok = $this->equipoModel->eliminar($id);
+} catch (PDOException $e) {
+    $ok = ($e->errorInfo[1] === 1451);
+}
+```
+
+Alternativa más limpia: contar los dependientes antes de borrar y mostrar un aviso legible ("no se puede eliminar: tiene N jugadores y M partidos").
+
+⚠️ **Los datos nunca se pierden.** `RESTRICT` funciona; lo que falla es el mensaje.
+
+---
+
+## 17. El Router reflejaba HTML en el mensaje de error
+
+**Error:** al pedir `index.php?controller=<script>alert(1)</script>`, el navegador ejecuta JavaScript.
+
+**Causa:** `Router::cargarController()` compone el mensaje de error con `$nombreClase`, que viene de la URL sin escapar, y lo imprime con `die()`.
+
+**Solución (pendiente de aplicar):** escapar en la salida **o**, mejor, no imprimir el nombre del archivo en absoluto:
+
+```php
+die('Error: controlador no encontrado.');           // lo ideal
+die('Error: controlador no encontrado: '
+    . htmlspecialchars($nombreClase, ENT_QUOTES, 'UTF-8'));
+```
+
+⚠️ **Escapar al imprimir, no al entrar:** el valor se usa además para construir la ruta del archivo, así que la validación correcta sigue siendo una lista blanca de nombres permitidos.
+
+---
+
+## 18. La redirección usaba el header Host
+
+**Error:** con `Host: evil.example.com`, la respuesta devuelve `Location: http://evil.example.com/...`.
+
+**Causa:** `BASE_URL` se construye en `config.php` con `$_SERVER['HTTP_HOST']`, que el cliente controla por completo.
+
+```text
+$ curl -H 'Host: evil.example.com' 'http://localhost/.../?controller=Auth&action=guardarRegistro' -d '...'
+Location: http://evil.example.com/ProyectoBasket-Deploy/public/?controller=Auth&action=register
+```
+
+**Solución (pendiente de aplicar):** no derivar la URL pública del request. Definirla a mano:
+
+```php
+define('BASE_URL', '/ProyectoBasket-Deploy/public');  // ruta, no dominio
+```
+
+Si hace falta dominio, validar `HTTP_HOST` contra una lista blanca. Mientras tanto, **no abras el proyecto a Internet.**
+
+---
+
+## 19. Los campos enviados como array provocaban 500
+
+**Error:** `POST` con `nombre[]=x` o `email[]=x` devuelve HTTP 500.
+
+**Causa:** `trim()` y `strtolower()` reciben un array. En PHP 8 eso es un `TypeError`: la función espera `string`. La misma causa está en el Router con `?controller[]=x`.
+
+**Solución (pendiente de aplicar):** comprobar el tipo antes de usar el valor.
+
+```php
+$nombre = isset($_POST['nombre']) && is_string($_POST['nombre'])
+    ? trim($_POST['nombre']) : '';
+```
+
+En el Router, lo ideal es una lista blanca:
+
+```php
+$permitidos = ['auth', 'equipos', 'jugadores', 'partidos', 'estadisticas'];
+if (!in_array($nombre, $permitidos, true)) {
+    die('Controlador no permitido.');
+}
+```
+
+⚠️ El mismo `method_exists()` del Router permite llamar a métodos **protegidos**: `?action=view` y `?action=requiereLogin` dan 500, y `?action=__construct` responde 200. Lo correcto es `is_callable([$controlador, $accion])`.
+
+---
+
+## 20. Los datos inválidos provocaban 500
+
+**Error:** introducir datos demasiado largos, una fecha no válida o un `equipo_id` inexistente devuelve HTTP 500.
+
+**Causa:** los controladores confían en el formulario HTML5 y no validan en el servidor. Lo que llega a PDO dispara una excepción que nadie captura.
+
+| Caso | Error MySQL | Código |
+|---|---|---|
+| Texto más largo que el `VARCHAR` | `Data too long for column` | 1406 |
+| `equipo_id` que no existe | `Cannot add or update a child row` | 1452 |
+| Fecha como `31/12/2026` | `Incorrect datetime value` | 1292 |
+| Puntos fuera de `INT UNSIGNED` | `Out of range value` | 1264 |
+
+**Solución (pendiente de aplicar):** validar en el servidor y, además, un `try/catch` que muestre un mensaje útil.
+
+```php
+if (mb_strlen($nombre) > 100) {
+    $errores[] = 'El nombre no puede superar los 100 caracteres.';
+}
+$fecha = DateTime::createFromFormat('Y-m-d\TH:i', $_POST['fecha'] ?? '');
+if (!$fecha || DateTime::getLastErrors()['warning_count']) {
+    $errores[] = 'La fecha no es válida.';
+}
+```
+
+⚠️ `htmlspecialchars()` y `type="datetime-local"` son ayudas del navegador, **no** validación. Se pueden esquivar con `curl`.
+
+---
+
+## 21. La base no restringía posiciones ni dorsales
+
+**Error:** se puede guardar `posicion = "ADMIN"` y dos jugadores con el mismo dorsal en el mismo equipo.
+
+**Causa:** `jugadores.posicion` es `VARCHAR(50)` y `numero` es `INT UNSIGNED` sin más restricciones. No hay `UNIQUE (equipo_id, numero)` ni lista blanca de posiciones. `equipos.nombre` tampoco es único.
+
+**Solución (pendiente de aplicar):** validar la posición contra la lista del enunciado (Base, Escolta, Alero, Ala-Pívot, Pívot) y añadir la restricción en el esquema:
+
+```sql
+ALTER TABLE jugadores ADD UNIQUE KEY uq_jugador_numero (equipo_id, numero);
+```
+
+⚠️ `VARCHAR` se eligió a propósito (ver `schema-explicado.md`, sección 3) para no bloquear valores nuevos; la consecuencia es que **la validación tiene que vivir en el controlador**, no en la base.
+
+---
+
 ## Resumen de lecciones
 
 | Tema | Lección |
@@ -455,4 +597,9 @@ y ejecutar la suite completa después. Así el resultado es idéntico en la segu
 | Flujo web | `header('Location:')` siempre con `exit`; PRG para formularios |
 | Sesión | `session_regenerate_id(true)` tras login; los mensajes se consumen con `unset` |
 | Rutas | `__DIR__` para includes |
+| Salida | Escapar al imprimir, no al recibir; mejor aún, no imprimir el dato |
+| URLs | `BASE_URL` no se deriva del header `Host`: lo controla el cliente |
+| PHP 8 | `trim()` sobre un array es `TypeError`: comprobar `is_string()` |
+| Confianza | El `required` del navegador es una ayuda visual, no una validación |
+| Integridad | Lo que no restringe la base hay que validarlo en el controlador |
 | Pruebas | Antes de "arreglar" el código, confirmar que el fallo no sea del test |
