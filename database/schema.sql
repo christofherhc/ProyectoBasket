@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS jugadores (
   equipo_id INT UNSIGNED NOT NULL COMMENT 'Equipo al que pertenece (FK)',
   creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
   KEY idx_jugador_equipo (equipo_id),
+  -- Un dorsal no puede repetirse dentro del mismo equipo.
+  -- NULL no cuenta como duplicado, así que los jugadores sin dorsal conviven.
+  UNIQUE KEY uq_jugador_camiseta (equipo_id, numero),
   CONSTRAINT fk_jugador_equipo FOREIGN KEY (equipo_id) REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -66,3 +69,63 @@ CREATE TABLE IF NOT EXISTS partidos (
   CONSTRAINT fk_partido_local FOREIGN KEY (equipo_local_id) REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_partido_visitante FOREIGN KEY (equipo_visitante_id) REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =============================================
+-- 5. AJUSTES QUE NO PUEDEN IR EN EL CREATE TABLE
+--
+-- CREATE TABLE IF NOT EXISTS no modifica una tabla que ya existe, así que
+-- la clave uq_jugador_camiseta solo se crea con una base nueva. Este bloque
+-- la añade también sobre una base importada antes de este cambio.
+--
+-- Se consulta information_schema en lugar de "DROP TABLE" para no perder
+-- datos: reimportar el esquema nunca debe ser una operación destructiva.
+--
+-- Además se comprueban los dorsales duplicados ANTES de añadir la clave. Si
+-- una base antigua los tiene, el ALTER falla con el error 1062 y aborta toda
+-- la importación del esquema, dejando al usuario sin esquema. En ese caso el
+-- índice se omite y se avisa, que es mejor que un import que se corta a mitad.
+-- =============================================
+
+SET @indice_ya_existe = (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME   = 'jugadores'
+    AND INDEX_NAME   = 'uq_jugador_camiseta'
+);
+
+SET @hay_duplicados = (
+  SELECT COUNT(*) FROM (
+    SELECT equipo_id, numero
+      FROM jugadores
+     WHERE numero IS NOT NULL
+     GROUP BY equipo_id, numero
+    HAVING COUNT(*) > 1
+  ) AS repetidos
+);
+
+SET @sql_indice = IF(
+  @indice_ya_existe > 0,
+  'DO 0',
+  IF(
+    @hay_duplicados > 0,
+    'DO 0',
+    'ALTER TABLE jugadores ADD UNIQUE KEY uq_jugador_camiseta (equipo_id, numero)'
+  )
+);
+
+PREPARE stmt_indice FROM @sql_indice;
+EXECUTE stmt_indice;
+DEALLOCATE PREPARE stmt_indice;
+
+-- Si el índice no se pudo crear por duplicados, se dice exactamente cuál sobra.
+SELECT IF(
+  @hay_duplicados > 0,
+  'AVISO: no se creó el índice único uq_jugador_camiseta porque hay dorsales repetidos dentro de un mismo equipo.',
+  'uq_jugador_camiseta verificado.'
+) AS estado_migracion;
+
+SELECT equipo_id, numero, COUNT(*) AS repetidos, GROUP_CONCAT(id ORDER BY id) AS ids_afectados
+  FROM jugadores
+ WHERE numero IS NOT NULL
+ GROUP BY equipo_id, numero
+HAVING COUNT(*) > 1;

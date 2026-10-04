@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 Verificado en las pruebas: pedir `action=guardar` por GET redirige al formulario **y no crea ningún registro**.
 
-⚠️ Nota: `eliminar()` **no** tiene esta comprobación, porque un enlace de borrar es un `GET`. Es un caso distinto: eliminar por GET es mala práctica (ver más abajo), pero es lo habitual en proyectos sencillos.
+⚠️ Nota: `eliminar()` **sí** la tiene. Antes el borrado era un enlace `GET`; tras la auditoría todos los formularios de borrado son POST con token CSRF, así que la comprobación se aplica igual: eliminar por GET es mala práctica (ver más abajo), pero es lo habitual en proyectos sencillos.
 
 ### Paso 2: leer y limpiar los datos
 
@@ -293,7 +293,7 @@ Ese `unset` es lo que hace que el mensaje aparezca **una sola vez**.
 | `filter_var()` para el email | Filtro rápido de formato |
 | Validaciones en orden | Se muestra el primer problema, no todos |
 | Logout en 4 pasos | Sesión realmente destruida |
-| Logout por GET | ⚠️ Limitación conocida (debería ser POST) |
+| Logout por GET | ✅ **Resuelto:** ahora es un formulario POST con token CSRF |
 
 ---
 

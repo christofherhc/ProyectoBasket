@@ -1,6 +1,7 @@
 <h1>Registrar Partido</h1>
 
 <form action="<?= BASE_URL ?>?controller=Partidos&action=guardar" method="POST">
+    <?= csrfCampo() ?>
     <div class="form-group">
         <label for="equipo_local_id">Equipo Local *</label>
         <select id="equipo_local_id" name="equipo_local_id" required>

@@ -112,13 +112,9 @@ Sin el segundo `if`, si el archivo se llamara `PartidosController.php` pero la c
 
 **`new $nombreClase()` con variable.** PHP permite instanciar una clase cuyo nombre está en una variable. Aquí `$nombreClase` es `"PartidosController"`, así que es como si pusieras `new PartidosController()`. Esto es lo que permite el enrutado dinámico.
 
-**⚠️ `die()` con un mensaje del `Router` sin escapar.** El nombre viene de `$_GET`, y aquí se imprime directamente en la respuesta HTML. En este proyecto está controlado porque solo se alcanza con rutas inválidas, pero es una práctica que conviene corregir en cuanto sepas hacerlo:
+**✅ `die()` sin datos del usuario dentro.** El nombre del controlador ya se validó contra la lista blanca `RUTAS` en `parseUrl()`, así que no puede contener nada escrito por un atacante. Aun así, el `Router` ya no imprime el nombre del archivo: se cambió a un método `error()` que devuelve 404 y solo muestra un mensaje fijo.
 
-```php
-die("Error: Controlador no encontrado: " . htmlspecialchars($nombreClase));
-```
-
-**Lección:** cuando imprimas algo que venga del usuario, escápalo. También en los mensajes de error.
+**Lección:** lo ideal es *no imprimir* el dato, no solo escaparlo. Escapar funciona; no imprimir es imposible de exploitationar.
 
 ### `executeAction()`: llamar al método
 
@@ -128,8 +124,9 @@ private function executeAction(): void {
         die("Error: Controlador no instanciado");
     }
 
-    if (!method_exists($this->controllerObjeto, $this->actionNombre)) {
-        die("Error: El método '{$this->actionNombre}' no existe en " . get_class($this->controllerObjeto));
+    // is_callable() y no method_exists(): ver la nota de abajo.
+    if (!is_callable([$this->controllerObjeto, $this->actionNombre])) {
+        $this->error('La acción solicitada no está disponible.');
     }
 
     call_user_func_array(
@@ -139,7 +136,21 @@ private function executeAction(): void {
 }
 ```
 
-**`method_exists()` antes de llamar.** Es la comprobación que evita el error fatal "Call to undefined method". Es la versión de *función* del `file_exists` de antes: primero compruebas que existe, luego llamas.
+**`is_callable()` antes de llamar.** Es la comprobación que evita el error fatal "Call to undefined method".
+
+⚠️ **Aquí se usa `is_callable()` y no `method_exists()`, y hay un motivo concreto:** `method_exists()` devuelve `true` también para métodos **protegidos** y **privados**, no solo para los públicos. Con `method_exists()` se podía pedir `?action=view` (que es `protected` en `Controller`) y PHP respondía con un error fatal al intentar invocarlo. `is_callable()` solo devuelve `true` para lo que se puede llamar desde fuera.
+
+Probado antes del arreglo:
+
+| URL | Con `method_exists()` | Con `is_callable()` |
+|---|---|---|
+| `?action=view` | HTTP 500 (fatal) | HTTP 404 |
+| `?action=requiereLogin` | HTTP 500 (fatal) | HTTP 404 |
+| `?action=__construct` | HTTP 200 (sin hacer nada) | HTTP 404 |
+
+`__construct` es el caso más curioso: `method_exists()` lo encontraba y `call_user_func_array()` lo invocaba, construyendo el controlador una segunda vez sin ejecutar ninguna acción.
+
+⚠️ **`is_callable()` por sí solo no basta.** Un método público inventado (`?action=volar`) seguiría siendo invocable, y `__construct` es público. Por eso el `Router` además contrasta el controlador y la acción contra la constante `RUTAS` antes de cargar nada. Las dos comprobaciones juntas: la lista blanca dice *qué* se puede llamar, `is_callable()` confirma que *realmente* se puede.
 
 **`call_user_func_array()`** es el equivalente en tiempo de ejecución de `metodo($args)`. Es lo que hace posible pasar argumentos dinámicos:
 
@@ -192,14 +203,54 @@ new Router()
                            └─ partidos/editar.php  ← el HTML que ve el usuario
 ```
 
-## 5. Qué NO hace este router
+## 5. La lista blanca `RUTAS` (añadido en la auditoría)
+
+Esta es la pieza de seguridad más importante del router. Antes de cargar nada, se contrasta la URL contra una constante:
+
+```php
+private const RUTAS = [
+    'auth'         => ['index', 'login', 'register', 'guardarregistro', 'logout'],
+    'equipos'      => ['index', 'crear', 'guardar', 'editar', 'actualizar', 'eliminar'],
+    'jugadores'    => ['index', 'crear', 'guardar', 'editar', 'actualizar', 'eliminar'],
+    'partidos'     => ['index', 'crear', 'guardar', 'editar', 'actualizar', 'eliminar'],
+    'estadisticas' => ['index'],
+];
+```
+
+Un controlador que no esté en el array no se carga. Una acción que no esté en la fila de su controlador no se ejecuta.
+
+⚠️ **Las acciones van en minúsculas** porque la comparación es `strtolower()` en los dos lados. El PHP real se llama `guardarRegistro`, con R mayúscula, y sigue funcionando: PHP resuelve los nombres de método sin distinguir mayúsculas, y la lista blanca solo normaliza para poder compararla de forma fiable.
+
+⚠️ **Sin lista blanca, `?controller=../../etc/passwd` construía una ruta de archivo con lo que mandara el visitante.** Ahora es imposible por construcción: si el nombre no está en el array, se corta la petición antes de tocar el disco.
+
+### Los helpers `get()` y `post()`
+
+`parseUrl()` ya no llama a `trim($_GET['controller'])` directamente. Usa los helpers de `app/core/helpers.php`:
+
+```php
+$controlador = strtolower(trim(get('controller', '')));
+$accion      = strtolower(trim(get('action', 'index')));
+```
+
+```php
+function get(string $clave, string $defecto = ''): string {
+    if (!isset($_GET[$clave]) || !is_string($_GET[$clave])) {
+        return $defecto;
+    }
+    return $_GET[$clave];
+}
+```
+
+**Por qué el `is_string()`.** Con `?controller[]=x`, PHP construye un array, no un texto. `trim()` sobre un array lanza un `TypeError` en PHP 8 y el visitante ve una pantalla en blanco. Con el `is_string()` el array se descarta y la petición sigue su curso (en este caso, el controlador por defecto). Ver el registro de errores #19.
+
+## 6. Qué NO hace este router
 
 - **No usa `$_SERVER['PATH_INFO']`** ni reescritura de URLs. Todo va por query string. Para un proyecto escolar es más que suficiente.
 - **No hay middleware.** La comprobación de sesión vive en `Controller::requiereLogin()`, no en el router.
-- **No valida los parámetros.** `?id=abc` llega al controlador como `'abc'`, y es el controlador quien hace `(int)` y comprueba `> 0`.
-- **No hay 404.** Si pides una acción inexistente, muestra `die("Error: El método 'xyz' no existe...")`. Es feo, pero es honesto y fácil de depurar.
+- **No valida los parámetros de negocio.** `?id=abc` llega al controlador como `'abc'`, y es el controlador quien hace `(int)` y comprueba `> 0`.
+- **No sabe qué acciones son públicas.** La lista blanca `RUTAS` dice qué acciones *existen*, no cuáles exigen sesión. Esa segunda decisión sigue en cada controlador, llamando a `requiereLogin()` al principio.
 
-## 6. Posibles mejoras (para cuando quieras ir más allá)
+## 7. Posibles mejoras (para cuando quieras ir más allá)
 
 Esto **no está implementado** en el proyecto; es solo por si algún día quieres evolucionarlo:
 
@@ -219,7 +270,7 @@ private array $accionesPublicas = ['login', 'index', 'register', 'guardarRegistr
 // Requiere .htaccess con mod_rewrite, que en XAMPP ya está disponible.
 ```
 
-## 7. Errores que Cometí y cómo evitarlos
+## 8. Errores que Cometí y cómo evitarlos
 
 | Error | Síntoma | Solución |
 |---|---|---|

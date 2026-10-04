@@ -249,7 +249,7 @@ onclick="return confirm('¿Eliminar este equipo?');"
 
 El `return` es lo que importa: hace que el enlace **no se siga** si el usuario cancela.
 
-⚠️ **Esto es usabilidad, no seguridad.** `confirm()` vive en el navegador del usuario: `curl` lo ignora, y cualquiera con JavaScript en la consola lo desactiva. La protección real contra un borrado no autorizado sería un formulario POST con token CSRF. Está documentado como limitación en `../Controllers/EquiposController-explicado.md` sección 8.
+⚠️ **Esto es usabilidad, no seguridad, y se dejó así a propósito.** `confirm()` vive en el navegador del usuario: `curl` lo ignora, y cualquiera con JavaScript en la consola lo desactiva. La protección real ya no depende de esto: el borrado es un POST con token CSRF que el servidor exige. La protección real contra un borrado no autorizado sería un formulario POST con token CSRF. Está documentado como limitación en `../Controllers/EquiposController-explicado.md` sección 8.
 
 ## 6. Una vista de formulario: `equipos/crear.php`
 

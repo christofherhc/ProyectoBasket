@@ -92,9 +92,9 @@ CREATE TABLE IF NOT EXISTS jugadores (
 
 Elegimos `RESTRICT` a propósito: es más seguro que la aplicación decida qué hacer. Si un usuario intenta borrar un equipo con jugadores, el `DELETE` falla y **no se destruye nada**.
 
-⚠️ **Pero "falla" aquí significa HTTP 500, no un mensaje amable.** `Database` configura `PDO::ERRMODE_EXCEPTION`, así que el error 1451 se lanza como `PDOException` y **ningún controlador la captura**: el usuario ve una pantalla en blanco. Es la limitación más visible del proyecto, y la reasona estar documentada en `06-Codigo-Explicado/Controllers/EquiposController-explicado.md` sección 8, con las dos formas de arreglarla.
+✅ **Y ahora el usuario ve un mensaje, no una pantalla en blanco.** `EquiposController::eliminar()` consulta cuántos jugadores y partidos tiene el equipo antes de intentar el borrado, así que casi nunca se llega a la excepción. Y si se llega (por una carrera entre dos peticiones, o por una consulta nueva que no valida), el manejador global de `public/index.php` traduce el error 1451 a un mensaje entendible. Ver `06-Codigo-Explicado/Controllers/EquiposController-explicado.md` y el registro de errores #16.
 
-⚠️ **Los datos sí están a salvo** (de eso se trata `RESTRICT`), pero la experiencia de usuario es un error 500 en vez de "No se puede eliminar: el equipo tiene jugadores registrados".
+⚠️ **Los datos siguen a salvo** (de eso se trata `RESTRICT`) y ahora el mensaje es "No se puede eliminar: tiene 3 jugador(es) y 2 partido(s) registrados".
 
 `ON UPDATE CASCADE` significa que si someday cambiaras el `id` de un equipo, las referencias se actualizan solas.
 
@@ -181,6 +181,74 @@ CREATE INDEX idx_partido_fecha ON partidos(fecha);
 La versión final (secciones 2, 5 y 6) usa `KEY` dentro del `CREATE TABLE`, `CREATE DATABASE IF NOT EXISTS` y `USE`, por lo que **se puede importar tantas veces como quieras sin errores**.
 
 **Lección general:** cuando un script de base de datos no es idempotente, la causa casi siempre es un elemento declarado fuera de su bloque (índices, constraints, triggers).
+
+## 9-bis. ⚠️ El índice único de dorsales y las bases que ya existían
+
+Después de la auditoría se añadió `UNIQUE KEY uq_jugador_camiseta (equipo_id, numero)` para que un dorsal no se repita dentro del mismo equipo. Aquí está el problema que dejaba la solución a medias.
+
+⚠️ **`CREATE TABLE IF NOT EXISTS` no actualiza una tabla que ya existe.** Su nombre lo dice: "crea la tabla si no hay ninguna". Si el usuario ya tenía la base creada con una versión anterior del script, la tabla `jugadores` ya estaba y **el `CREATE TABLE` se saltaba entero**: el índice inline nunca se creaba, y el usuario que creyera que la restricción estaba activa seguía pudiendo meter dorsales repetidos sin enterarse.
+
+Por eso el final de `schema.sql` tiene un bloque aparte que consulta `information_schema` y añade el índice con `ALTER TABLE` si falta.
+
+### ⚠️ Y el `ALTER` también puede fallar
+
+Añadir el índice a una base antigua con datos ya guardados es exactamente el caso donde el `ALTER` revienta:
+
+```
+ERROR 1062 (23000): Duplicate entry '1-23' for key 'uq_jugador_camiseta'
+```
+
+⚠️ **Un `ALTER` que falla aborta todo el `import`.** MySQL detiene el script en el primer error si el cliente está en modo estricto (XAMPP lo está). El usuario se queda **sin las tablas de la sección 5**, es decir, con la base a medias, y el mensaje de error habla de un índice que ni siquiera estaba usando.
+
+⚠️ **Esto no es hipotético: es lo que pasa con cualquier base real.** Los datos de prueba están limpios, pero una base usada un tiempo puede tener dorsales repetidos sin problema, porque hasta ahora nada lo impedía.
+
+La solución es comprobar los duplicados **antes** de intentar el `ALTER`, y si los hay, saltar el índice y explicar cuál es el problema:
+
+```sql
+SET @hay_duplicados = (
+  SELECT COUNT(*) FROM (
+    SELECT equipo_id, numero FROM jugadores
+     WHERE numero IS NOT NULL
+     GROUP BY equipo_id, numero
+    HAVING COUNT(*) > 1
+  ) AS repetidos
+);
+```
+
+Y al final, en lugar de fallar en silencio:
+
+```sql
+SELECT equipo_id, numero, COUNT(*) AS repetidos,
+       GROUP_CONCAT(id ORDER BY id) AS ids_afectados
+  FROM jugadores
+ WHERE numero IS NOT NULL
+ GROUP BY equipo_id, numero
+HAVING COUNT(*) > 1;
+```
+
+que en la base de prueba produce exactamente esto:
+
+```
++----------+--------+-----------+---------------+
+| equipo_id | numero | repetidos | ids_afectados |
++----------+--------+-----------+---------------+
+|        1 |     23 |         2 | 1,13          |
++----------+--------+-----------+---------------+
+```
+
+⚠️ **Se omite la restricción en lugar de inventarse una solución.** La alternativa sería borrar los repetidos automáticamente, pero un script de esquema **no debe decidir qué filas son las correctas**. Decirle al usuario "el dorsal 23 del equipo 1 está en los jugadores 1 y 13" es información útil; borrar uno de los dos sin que nadie lo haya pedido es destruir datos.
+
+⚠️ **`WHERE numero IS NOT NULL` es obligatorio.** El dorsal es opcional, así que hay jugadores con `NULL`. En un `UNIQUE`, varios `NULL` en la misma columna **no** se consideran duplicados, así que se pueden insertar sin problema (se comprobó: dos jugadores sin dorsal en el mismo equipo conviven). Si el filtro no estuviera, el `GROUP BY` contaría los `NULL` como repetidos y saltaría el índice sin motivo.
+
+⚠️ **La migración se probó en los tres escenarios,** no solo en el fácil:
+
+| Base de partida | Índice creado | Import |
+|---|---|---|
+| Vacía (esquema nuevo) | Inline en el `CREATE TABLE` | Sin errores |
+| Antigua **sin** duplicados | Sí, con el `ALTER` | Sin errores |
+| Antigua **con** duplicados | No, se omite y avisa | **Sin errores**, exit 0 |
+
+⚠️ **El último caso es el importante.** Un esquema que se importa bien es mejor que uno que se importa "hasta donde da error".
 
 ## 10. Resumen de las 4 tablas
 

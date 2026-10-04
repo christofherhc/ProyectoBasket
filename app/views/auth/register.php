@@ -1,6 +1,7 @@
 <h1>Registrarse</h1>
 
 <form action="<?= BASE_URL ?>?controller=Auth&action=guardarRegistro" method="POST">
+    <?= csrfCampo() ?>
     <div class="form-group">
         <label for="nombre">Nombre completo</label>
         <input type="text" id="nombre" name="nombre" value="<?= isset($old['nombre']) ? htmlspecialchars($old['nombre']) : '' ?>" required>

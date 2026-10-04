@@ -29,7 +29,18 @@ class Partido extends Model {
         $stmt->bindValue(':pv', $puntosVisitante, PDO::PARAM_INT);
         $stmt->bindValue(':fecha', $fecha, PDO::PARAM_STR);
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
-        return $stmt->execute();
+        // execute() devuelve true aunque no se modifique ninguna fila.
+        // rowCount() dice si el registro existía, PERO MySQL cuenta filas
+        // *cambiadas*, no filas *encontradas*: si se guarda un equipo sin
+        // tocar nada, rowCount() es 0 aunque el equipo exista de sobra.
+        // Por eso, cuando no cambia nada, se pregunta aparte si el id existe.
+        if (!$stmt->execute()) {
+            return false;
+        }
+        if ($stmt->rowCount() > 0) {
+            return true;
+        }
+        return $this->obtenerPorId($id) !== null;
     }
 
     public function obtenerTodos(): array {

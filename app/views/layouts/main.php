@@ -18,7 +18,12 @@
                 <li><a href="<?= BASE_URL ?>?controller=Jugadores&action=index">Jugadores</a></li>
                 <li><a href="<?= BASE_URL ?>?controller=Partidos&action=index">Partidos</a></li>
                 <li><a href="<?= BASE_URL ?>?controller=Estadisticas&action=index">Estadísticas</a></li>
-                <li><a href="<?= BASE_URL ?>?controller=Auth&action=logout">Cerrar Sesión (<?= htmlspecialchars($_SESSION['nombre']) ?>)</a></li>
+                <li>
+                    <form action="<?= BASE_URL ?>?controller=Auth&action=logout" method="POST" class="inline-form">
+                        <?= csrfCampo() ?>
+                        <button type="submit" class="btn-link">Cerrar Sesión (<?= e($_SESSION['nombre']) ?>)</button>
+                    </form>
+                </li>
             <?php else: ?>
                 <li><a href="<?= BASE_URL ?>?controller=Auth&action=index">Iniciar Sesión</a></li>
                 <li><a href="<?= BASE_URL ?>?controller=Auth&action=register">Registrarse</a></li>
@@ -44,12 +49,13 @@
 
             <?php
             // Cargar vista específica
-            $vistaArchivo = '../app/views/' . $vista . '.php';
-            if (file_exists($vistaArchivo)) {
+            // __DIR__ evita depender del directorio de trabajo de PHP.
+            $vistaArchivo = __DIR__ . '/../' . $vista . '.php';
+            if (is_file($vistaArchivo)) {
                 require_once $vistaArchivo;
             } else {
+                // No se imprime la ruta del disco: sería información interna.
                 echo '<h2>Error: Vista no encontrada</h2>';
-                echo '<p>' . htmlspecialchars($vistaArchivo) . '</p>';
             }
             ?>
         </div>

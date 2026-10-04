@@ -203,3 +203,31 @@ footer {
     padding: 1.5rem;
     margin-top: 2rem;
 }
+
+/* =============================================
+   Formularios en línea (logout y botones de eliminar).
+   Sin esto, un <form> dentro de una celda <td> se
+   muestra en bloque y rompe la maquetación de la tabla.
+   ============================================= */
+.inline-form {
+    display: inline;
+    margin: 0;
+}
+
+.inline-form .btn,
+.btn-link {
+    cursor: pointer;
+    font: inherit;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: #2c3e50;
+    padding: 0;
+    text-decoration: underline;
+}
+
+.btn-link:hover {
+    color: #1a252f;
+}

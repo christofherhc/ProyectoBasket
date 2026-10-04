@@ -1,74 +1,47 @@
 # Documento Técnico: Gestión de Liga de Básquetbol (PHP MVC)
 
-**Extensión:** 565 palabras (aprox.)  
-**Autor:** Proyecto de Aprendizaje  
-**Fecha:** 2026-10-03
+- **Extensión:** 599 palabras (requisito: entre 500 y 800)
+- **Autor:** Proyecto de Aprendizaje
+- **Fecha:** 2026-10-04
 
 ## 1. Arquitectura
 
-El sistema sigue una arquitectura **MVC ligero** (Modelo-Vista-Controlador) implementada en PHP vanilla sin frameworks. Se emplea el patrón **Front Controller** mediante `public/index.php`, que centraliza todas las peticiones. El enrutador (`app/core/Router.php`) interpreta parámetros GET (`controller`, `action`, `id`) y delega al controlador correspondiente.
-
-Capas:
-- **Modelo**: Acceso a datos y lógica de negocio (extends Model)
-- **Vista**: Presentación HTML con layout compartido
-- **Controlador**: Coordinación entre modelo y vista
-- **Core**: Clases base reutilizables (Database, Model, Controller, Router)
-- **Config**: Constantes de BD/URL
+El sistema implementa una arquitectura **MVC ligero** en PHP vanilla, sin frameworks ni gestor de dependencias. Toda petición entra por un único punto: `public/index.php`, que actúa como **Front Controller** e inicializa sesión, cookies y manejador global de errores antes de delegar. `app/core/Router.php` interpreta `controller`, `action` y parámetros de la URL, y los valida contra una lista blanca declarada en la constante `RUTAS`. Las capas son: **Modelos** (datos y reglas de negocio), **Vistas** (plantillas PHP con layout compartido), **Controladores** (coordinación), **Core** (clases base reutilizables) y **Config** (constantes).
 
 ## 2. Componentes Clave
 
-**Core/Database.php**: Conexión PDO singleton. Usa prepared statements, `PDO::ERRMODE_EXCEPTION`, `FETCH_ASSOC`, `utf8mb4`.
-
-**Core/Model.php**: Métodos base `obtenerTodos()`, `obtenerPorId()`, `eliminar()`, `obtenerUltimoId()`. Modelos heredan conexión `$db` y definen `$tabla`.
-
-**Core/Controller.php**: `view()` (extract + layout), `requiereLogin()` para proteger rutas.
-
-**Core/Router.php**: Parseo URL, validación, carga e instanciación dinámica de controladores, `call_user_func_array`.
-
-**Modelos**: `Usuario`, `Equipo`, `Jugador`, `Partido` con consultas parametrizadas.
-
-**Controladores**: `AuthController`, `EquiposController`, `JugadoresController`, `PartidosController`, `EstadisticasController`.
-
-**Vistas**: Layout `main.php` + carpetas por módulo. Uso de `htmlspecialchars()` para escapar salida.
+`Database.php` implementa el patrón *singleton* sobre PDO con `ERRMODE_EXCEPTION`, `FETCH_ASSOC` y `utf8mb4`. `Model.php` aporta `obtenerTodos()`, `obtenerPorId()`, `crear()`, `actualizar()`, `eliminar()` y `obtenerUltimoId()`. `Controller.php` resuelve la vista con `extract()` y el layout, e implementa `requiereLogin()`. `helpers.php` centraliza funciones sin clase: escapado, tokens CSRF, mensajes flash, redirecciones y validación. Los modelos `Usuario`, `Equipo`, `Jugador` y `Partido` heredan de `Model`; los controladores `AuthController`, `EquiposController`, `JugadoresController`, `PartidosController` y `EstadisticasController` coordinan los cinco módulos exigidos.
 
 ## 3. Funcionalidades Desarrolladas
 
-**Autenticación**: Registro con validaciones (campos, email válido, contraseñas coinciden, mínimo 6, email único). Login con `password_verify()`, `session_regenerate_id()`, logout completo. Mensajes flash.
-
-**Equipos (CRUD)**: Crear/editar/listar/eliminar con validación año fundación.
-
-**Jugadores (CRUD + asignación)**: Asignación a equipo (select), JOIN para mostrar nombre equipo, validación número 0-99.
-
-**Partidos (CRUD + lógica)**: Dos FKs a equipos, validación distinto equipo, marcador, cálculo resultado (Gana Local/Visitante/Empate), fecha datetime-local.
-
-**Estadísticas**: Tabla posiciones (PJ/PG/PE/PP/GF/GC/DIF) ordenada por PG desc, DIF desc. Últimos 10 partidos. Cálculo por iteración sobre partidos (métricas básicas).
+**Autenticación:** registro con validación de email, coincidencia de contraseñas y longitud mínima; inicio de sesión con `password_verify()`, regeneración de identificador de sesión y bloqueo tras cinco intentos fallidos. **Equipos, jugadores y partidos:** CRUD completo con listados, asignación de jugadores a equipos y registro de encuentros con marcador y resultado calculado. **Estadísticas:** tabla de posiciones (PJ, PG, PE, PP, GF, GC, DIF) ordenada por victorias y diferencia, más los últimos diez resultados.
 
 ## 4. Código Fuente Relevante
 
-**Auth hash** (`AuthController::guardarRegistro`): `$hash = password_hash($password, PASSWORD_DEFAULT);`  
-**Login verify** (`AuthController::login`): `password_verify($password, $usuario['password'])`  
-**JOIN jugadores** (`Jugador::obtenerTodos`): `LEFT JOIN equipos e ON e.id = j.equipo_id`  
-**JOIN partidos** (`Partido::obtenerTodos`): JOIN doble a equipos (local/visitante)  
-**Router dinámico** (`Router::executeAction`): `call_user_func_array([$obj, $action], [$params])`
+El enrutamiento resuelve el controlador mediante `is_callable()` sobre un nombre de clase ya filtrado:
+
+```php
+if (!isset(self::RUTAS[strtolower($nombreClase)])) {
+    $this->error("Controlador no disponible.");
+}
+```
+
+El borrado exige POST y token válido antes de tocar la base de datos:
+
+```php
+exigirPost('controller=Equipos&action=index');
+```
+
+Las consultas usan siempre sentencias preparadas con parámetros vinculados, nunca concatenación de variables.
 
 ## 5. Resolución de Problemas
 
-**Formato datetime-local**: Convertir `DATETIME` (YYYY-MM-DD HH:MM:SS) a `YYYY-MM-DDTHH:MM` con `substr(...,0,16)`.  
-**NULL en BD**: Diferenciar vacío vs NULL (fundación/número/posición).  
-**JOINs dobles**: Alias el/ev para evitar ambigüedad.  
-**Mensajes flash**: Usar `$_SESSION` + `unset()` tras mostrar (una sola vez).  
-**Rutas relativas**: Usar `__DIR__` y `../` coherentes desde `public/`.
+La primera versión delegaba toda la validación en el navegador y documentaba sus carencias. La revisión final las corrigió en el servidor. El problema más serio era el **borrado de un equipo con jugadores**: la restricción `ON DELETE RESTRICT` lanzaba una excepción sin capturar y el usuario veía una pantalla vacía. Se añadió una comprobación previa de dependencias y un manejador global que traduce los códigos de MySQL en mensajes comprensibles, sin exponer el texto original. También se detectaron y corrigieron un XSS reflejado en el mensaje del enrutador, la desviación de redirecciones mediante la cabecera `Host`, campos enviados como array que provocaban errores internos, dorsales duplicados y posiciones fuera de catálogo.
+
+Dos detalles merecen mención: `DateTime::createFromFormat()` acepta fechas inexistentes como el 31 de febrero, por lo que se validan sus avisos; y `rowCount()` cuenta filas *cambiadas*, no *encontradas*, de modo que guardar un registro sin modificarlo se confundía con un identificador inexistente.
 
 ## 6. Decisiones de Diseño
 
-- **Vanilla PHP**: Aprendizaje fundamentos sin magia.
-- **MVC ligero**: Claridad, legible, fácil replicar.
-- **GET routing**: Transparente, sin .htaccess.
-- **PDO singleton**: Una conexión, prepared statements.
-- **Sesiones auth**: Simple, correcto.
-- **CSS puro**: Sin frameworks, entendible.
-- **LEFT JOIN**: Mostrar aunque dato relacionado falte (robusto).
-- **Validación servidor**: Obligatoria (nunca solo cliente).
-- **Feature branches + commits atómicos**: Historial progresivo.
+Se eligió PHP vanilla para comprender los mecanismos sin abstracciones ocultas, y una lista blanca en el enrutador por seguridad: sólo se cargan los módulos declarados en ella. `posicion` es texto validado contra un catálogo en lugar de `ENUM`, para admitir valores nuevos sin alterar el esquema. La contraseña se almacena con el hash por defecto de PHP y las sesiones exigen cookies `HttpOnly`, `SameSite` y `Secure` bajo HTTPS. El historial Git se mantiene mediante ramas de funcionalidad y commits atómicos. Una suite de 84 comprobaciones automatizadas verifica el comportamento y restaura los datos de prueba al terminar.
 
-Todo cumple requerimientos: módulos, Git, doc en `/doc/practica_liga.md`, `.git` intacto.
+Todo cumple los requerimientos: módulos funcionales, control de versiones, documento en `/doc/practica_liga.md` e historial `.git` intacto.

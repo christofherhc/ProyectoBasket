@@ -8,8 +8,8 @@ class PartidosController extends Controller {
     private Equipo $equipoModel;
 
     public function __construct() {
-        require_once '../app/models/Partido.php';
-        require_once '../app/models/Equipo.php';
+        require_once __DIR__ . '/../models/Partido.php';
+        require_once __DIR__ . '/../models/Equipo.php';
         $this->partidoModel = new Partido();
         $this->equipoModel = new Equipo();
     }
@@ -37,51 +37,26 @@ class PartidosController extends Controller {
 
     public function guardar(): void {
         $this->requiereLogin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . '?controller=Partidos&action=crear');
-            exit;
+        exigirPost('controller=Partidos&action=crear');
+
+        [$datos, $errores] = $this->validarCampos();
+
+        if ($errores !== []) {
+            flashError(implode(' ', $errores));
+            redir('controller=Partidos&action=crear');
         }
 
-        $equipoLocalId = (int)($_POST['equipo_local_id'] ?? 0);
-        $equipoVisitanteId = (int)($_POST['equipo_visitante_id'] ?? 0);
-        $puntosLocal = (int)($_POST['puntos_local'] ?? 0);
-        $puntosVisitante = (int)($_POST['puntos_visitante'] ?? 0);
-        $fecha = trim($_POST['fecha'] ?? '');
+        $this->partidoModel->crear(
+            $datos['equipo_local_id'],
+            $datos['equipo_visitante_id'],
+            $datos['puntos_local'],
+            $datos['puntos_visitante'],
+            $datos['fecha']
+        );
 
-        $_SESSION['old_partido'] = [
-            'equipo_local_id' => $equipoLocalId,
-            'equipo_visitante_id' => $equipoVisitanteId,
-            'puntos_local' => $puntosLocal,
-            'puntos_visitante' => $puntosVisitante,
-            'fecha' => $fecha
-        ];
-
-        if ($equipoLocalId <= 0 || $equipoVisitanteId <= 0) {
-            $_SESSION['error'] = 'Debe seleccionar ambos equipos';
-            header('Location: ' . BASE_URL . '?controller=Partidos&action=crear');
-            exit;
-        }
-        if ($equipoLocalId === $equipoVisitanteId) {
-            $_SESSION['error'] = 'El equipo local y visitante no pueden ser iguales';
-            header('Location: ' . BASE_URL . '?controller=Partidos&action=crear');
-            exit;
-        }
-        if ($fecha === '') {
-            $_SESSION['error'] = 'La fecha es obligatoria';
-            header('Location: ' . BASE_URL . '?controller=Partidos&action=crear');
-            exit;
-        }
-        if ($puntosLocal < 0 || $puntosVisitante < 0) {
-            $_SESSION['error'] = 'Los puntos no pueden ser negativos';
-            header('Location: ' . BASE_URL . '?controller=Partidos&action=crear');
-            exit;
-        }
-
-        $this->partidoModel->crear($equipoLocalId, $equipoVisitanteId, $puntosLocal, $puntosVisitante, $fecha);
         unset($_SESSION['old_partido']);
-        $_SESSION['exito'] = 'Partido registrado correctamente';
-        header('Location: ' . BASE_URL . '?controller=Partidos&action=index');
-        exit;
+        flashExito('Partido registrado correctamente');
+        redir('controller=Partidos&action=index');
     }
 
     public function editar(array $params): void {
@@ -89,9 +64,8 @@ class PartidosController extends Controller {
         $id = (int)($params['id'] ?? 0);
         $partido = $this->partidoModel->obtenerPorId($id);
         if ($partido === null) {
-            $_SESSION['error'] = 'Partido no encontrado';
-            header('Location: ' . BASE_URL . '?controller=Partidos&action=index');
-            exit;
+            flashError('Partido no encontrado');
+            redir('controller=Partidos&action=index');
         }
         $equipos = $this->equipoModel->obtenerTodos();
         $old = $_SESSION['old_partido'] ?? [];
@@ -106,58 +80,161 @@ class PartidosController extends Controller {
 
     public function actualizar(): void {
         $this->requiereLogin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . '?controller=Partidos&action=index');
-            exit;
-        }
-        $id = (int)($_POST['id'] ?? 0);
-        $equipoLocalId = (int)($_POST['equipo_local_id'] ?? 0);
-        $equipoVisitanteId = (int)($_POST['equipo_visitante_id'] ?? 0);
-        $puntosLocal = (int)($_POST['puntos_local'] ?? 0);
-        $puntosVisitante = (int)($_POST['puntos_visitante'] ?? 0);
-        $fecha = trim($_POST['fecha'] ?? '');
+        exigirPost('controller=Partidos&action=index');
 
-        $_SESSION['old_partido'] = [
-            'equipo_local_id' => $equipoLocalId,
-            'equipo_visitante_id' => $equipoVisitanteId,
-            'puntos_local' => $puntosLocal,
-            'puntos_visitante' => $puntosVisitante,
-            'fecha' => $fecha
-        ];
+        $id = (int)post('id');
+        [$datos, $errores] = $this->validarCampos();
 
-        if ($id <= 0 || $equipoLocalId <= 0 || $equipoVisitanteId <= 0) {
-            $_SESSION['error'] = 'Datos inválidos';
-            header('Location: ' . BASE_URL . '?controller=Partidos&action=index');
-            exit;
-        }
-        if ($equipoLocalId === $equipoVisitanteId) {
-            $_SESSION['error'] = 'Equipos no pueden ser iguales';
-            header('Location: ' . BASE_URL . '?controller=Partidos&action=editar&id=' . $id);
-            exit;
-        }
-        if ($fecha === '' || $puntosLocal < 0 || $puntosVisitante < 0) {
-            $_SESSION['error'] = 'Datos inválidos (fecha/puntos)';
-            header('Location: ' . BASE_URL . '?controller=Partidos&action=editar&id=' . $id);
-            exit;
+        if ($errores === []) {
+            $errores = $this->validarId($id);
         }
 
-        $this->partidoModel->actualizar($id, $equipoLocalId, $equipoVisitanteId, $puntosLocal, $puntosVisitante, $fecha);
+        $volver = 'controller=Partidos&action=editar&id=' . $id;
+
+        if ($errores !== []) {
+            flashError(implode(' ', $errores));
+            redir($volver);
+        }
+
+        $actualizado = $this->partidoModel->actualizar(
+            $id,
+            $datos['equipo_local_id'],
+            $datos['equipo_visitante_id'],
+            $datos['puntos_local'],
+            $datos['puntos_visitante'],
+            $datos['fecha']
+        );
+
         unset($_SESSION['old_partido']);
-        $_SESSION['exito'] = 'Partido actualizado correctamente';
-        header('Location: ' . BASE_URL . '?controller=Partidos&action=index');
-        exit;
+
+        if (!$actualizado) {
+            flashError('No se encontró el partido que se quiso modificar');
+            redir('controller=Partidos&action=index');
+        }
+
+        flashExito('Partido actualizado correctamente');
+        redir('controller=Partidos&action=index');
     }
 
     public function eliminar(array $params): void {
         $this->requiereLogin();
-        $id = (int)($params['id'] ?? 0);
-        if ($id > 0) {
-            $this->partidoModel->eliminar($id);
-            $_SESSION['exito'] = 'Partido eliminado correctamente';
-        } else {
-            $_SESSION['error'] = 'ID inválido';
+        exigirPost('controller=Partidos&action=index');
+
+        $id = (int)post('id');
+
+        if ($id <= 0) {
+            flashError('ID de partido inválido');
+            redir('controller=Partidos&action=index');
         }
-        header('Location: ' . BASE_URL . '?controller=Partidos&action=index');
-        exit;
+
+        if (!$this->partidoModel->eliminar($id)) {
+            flashError('No se encontró el partido que se quiso eliminar');
+            redir('controller=Partidos&action=index');
+        }
+
+        flashExito('Partido eliminado correctamente');
+        redir('controller=Partidos&action=index');
+    }
+
+    /**
+     * Valida los campos del formulario de partido.
+     *
+     * @return array [datos, errores]
+     */
+    private function validarCampos(): array {
+        $local     = (int)post('equipo_local_id', '0');
+        $visitante = (int)post('equipo_visitante_id', '0');
+        $puntosLocal     = trim(post('puntos_local', '0'));
+        $puntosVisitante = trim(post('puntos_visitante', '0'));
+        $fechaBruta = trim(post('fecha'));
+
+        $_SESSION['old_partido'] = [
+            'equipo_local_id'     => $local,
+            'equipo_visitante_id' => $visitante,
+            'puntos_local'        => $puntosLocal,
+            'puntos_visitante'    => $puntosVisitante,
+            'fecha'               => $fechaBruta,
+        ];
+
+        $errores = [];
+
+        // Equipos: los dos deben existir (si no, error 1452 de clave foránea).
+        if ($local <= 0 || $visitante <= 0) {
+            $errores[] = 'Debe seleccionar ambos equipos';
+        } elseif ($local === $visitante) {
+            $errores[] = 'El equipo local y el visitante no pueden ser iguales';
+        } else {
+            if ($this->equipoModel->obtenerPorId($local) === null) {
+                $errores[] = 'El equipo local seleccionado no existe';
+            }
+            if ($this->equipoModel->obtenerPorId($visitante) === null) {
+                $errores[] = 'El equipo visitante seleccionado no existe';
+            }
+        }
+
+        // Puntos: se validan como texto para detectar "abc" o "-5" antes de que
+        // MySQL lance el error 1264 (out of range).
+        $pl = $this->validarPuntos($puntosLocal, 'local', $errores);
+        $pv = $this->validarPuntos($puntosVisitante, 'visitante', $errores);
+
+        // Fecha: se normaliza a DATETIME; si no existe de verdad, error 1292.
+        $fecha = fechaValida($fechaBruta);
+        if ($fechaBruta === '') {
+            $errores[] = 'La fecha es obligatoria';
+        } elseif ($fecha === null) {
+            $errores[] = 'La fecha indicada no es válida';
+        }
+
+        return [
+            [
+                'equipo_local_id'     => $local,
+                'equipo_visitante_id' => $visitante,
+                'puntos_local'        => $pl ?? 0,
+                'puntos_visitante'    => $pv ?? 0,
+                'fecha'               => $fecha ?? '',
+            ],
+            $errores,
+        ];
+    }
+
+    /**
+     * Valida un marcador y lo añade a la lista de errores si no cuadra.
+     *
+     * @param string $valor
+     * @param string $lado
+     * @param array  $errores
+     * @return int|null
+     */
+    private function validarPuntos(string $valor, string $lado, array &$errores): ?int {
+        if ($valor === '') {
+            $errores[] = 'Los puntos del equipo ' . $lado . ' son obligatorios';
+            return null;
+        }
+        if (!ctype_digit($valor)) {
+            $errores[] = 'Los puntos del equipo ' . $lado . ' deben ser un número entero';
+            return null;
+        }
+        $puntos = (int)$valor;
+        if ($puntos > MAX_PUNTOS) {
+            $errores[] = 'Los puntos del equipo ' . $lado . ' no pueden superar ' . MAX_PUNTOS;
+            return null;
+        }
+        return $puntos;
+    }
+
+    /**
+     * Comprueba que el id sea válido y que el partido exista.
+     *
+     * @param int $id
+     * @return array Lista de errores
+     */
+    private function validarId(int $id): array {
+        if ($id <= 0) {
+            return ['ID de partido inválido'];
+        }
+        if ($this->partidoModel->obtenerPorId($id) === null) {
+            return ['No se encontró el partido que se quiso modificar'];
+        }
+        return [];
     }
 }

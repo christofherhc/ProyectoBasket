@@ -19,7 +19,8 @@ ProyectoBasket/
 │   │   ├── Database.php        # Conexión PDO singleton
 │   │   ├── Model.php           # Clase base para modelos (CRUD común)
 │   │   ├── Controller.php      # Clase base para controladores (método view)
-│   │   └── Router.php          # Enrutamiento + Front Controller logic
+│   │   ├── Router.php          # Enrutamiento + Front Controller logic
+│   │   └── helpers.php         # Funciones compartidas: CSRF, flash, validación
 │   │
 │   ├── models/                 # Modelos (acceso a datos + lógica negocio)
 │   │   ├── Usuario.php         # Autenticación/usuarios
@@ -108,7 +109,8 @@ Contiene **TODO** el código PHP de negocio. Fuera de `public/` por seguridad (n
 | `Database.php` | Conexión PDO singleton. Retorna instancia única `$pdo`. Configura opciones seguras. | Reutilizable por todos modelos. Evita múltiples conexiones. Centraliza config BD. |
 | `Model.php` | Clase padre con lógica común (obtenerTodos, obtenerPorId, crear, actualizar, eliminar...). Usa `$this->db`. Define `$tabla`. | DRY: evita duplicar CRUD en cada modelo. Modelos solo extienden y especializan. |
 | `Controller.php` | Clase padre con `view($vista, $datos)`. Hace `extract()` y carga layout `main.php`. | DRY: todos controladores comparten renderizado. Centraliza paso datos→vista. |
-| `Router.php` | Lee `$_GET[controller/action/params]`, valida, carga controlador, ejecuta acción. | Separa lógica de enrutamiento. Front Controller delega aquí. |
+| `Router.php` | Lee `$_GET[controller/action/params]`, contrasta contra la lista blanca `RUTAS`, carga el controlador y ejecuta la acción. | Separa lógica de enrutamiento. La lista blanca impide cargar archivos ajenos y llamar métodos protegidos. |
+| `helpers.php` | Funciones puras sin clase: `post()`, `get()`, `e()`, `csrfToken()`, `csrfCampo()`, `exigirCsrf()`, `exigirPost()`, `redir()`, `flashError()`, `flashExito()`, `cabeEnColumna()`, `fechaValida()`, `errorAmigable()`. | Se cargan una vez en `index.php`. Al ser funciones y no métodos, cualquier vista puede llamarlas sin tener un objeto. |
 
 ### `app/models/`
 

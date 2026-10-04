@@ -2,7 +2,7 @@
 
 /**
  * AuthController - Controlador de Autenticación
- * 
+ *
  * Gestiona registro, inicio de sesión y cierre de sesión
  */
 class AuthController extends Controller {
@@ -12,10 +12,9 @@ class AuthController extends Controller {
     public function index(): void {
         // Si ya está logueado, redirigir
         if (isset($_SESSION['usuario_id'])) {
-            header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
-            exit;
+            redir('controller=Equipos&action=index');
         }
-        
+
         $this->view('auth/login', [
             'titulo' => 'Iniciar Sesión'
         ]);
@@ -25,42 +24,55 @@ class AuthController extends Controller {
      * Procesa login
      */
     public function login(): void {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . '?controller=Auth&action=index');
-            exit;
+        exigirPost('controller=Auth&action=index');
+
+        $email    = strtolower(trim(post('email')));
+        $password = post('password');
+
+        // Se compara con === '' en vez de usar empty() porque empty('0') es true
+        // y la contraseña "0" sería rechazada sin motivo.
+        if ($email === '' || $password === '') {
+            flashError('Email y contraseña son obligatorios');
+            redir('controller=Auth&action=index');
         }
-        
-        $email = trim(strtolower($_POST['email'] ?? ''));
-        $password = $_POST['password'] ?? '';
-        
-        if (empty($email) || empty($password)) {
-            $_SESSION['error'] = 'Email y contraseña son obligatorios';
-            header('Location: ' . BASE_URL . '?controller=Auth&action=index');
-            exit;
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            flashError('El email no tiene un formato válido');
+            redir('controller=Auth&action=index');
         }
-        
+
+        // Bloqueo temporal tras 5 intentos fallidos en 15 minutos.
+        if (loginBloqueado()) {
+            flashError('Demasiados intentos fallidos. Espera 15 minutos antes de volver a intentarlo.');
+            redir('controller=Auth&action=index');
+        }
+
         // Cargar modelo usuario
-        require_once '../app/models/Usuario.php';
+        require_once __DIR__ . '/../models/Usuario.php';
         $usuarioModel = new Usuario();
-        
+
         $usuario = $usuarioModel->buscarPorEmail($email);
-        
-        if ($usuario === null || !password_verify($password, $usuario['password'])) {
-            $_SESSION['error'] = 'Credenciales incorrectas';
-            header('Location: ' . BASE_URL . '?controller=Auth&action=index');
-            exit;
+
+        // Se verifica siempre la contraseña, aunque el usuario no exista.
+        // Si no, el tiempo de respuesta revelaría qué emails existen.
+        $hash = $usuario['password'] ?? '$2y$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinva';
+        if (!password_verify($password, $hash) || $usuario === null) {
+            registrarIntentoFallido();
+            flashError('Credenciales incorrectas');
+            redir('controller=Auth&action=index');
         }
-        
+
+        limpiarIntentosFallidos();
+
         // Login exitoso
         session_regenerate_id(true);
         $_SESSION['usuario_id'] = $usuario['id'];
         $_SESSION['nombre'] = $usuario['nombre'];
         $_SESSION['email'] = $usuario['email'];
         $_SESSION['logueado'] = true;
-        
-        $_SESSION['exito'] = 'Sesión iniciada correctamente';
-        header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
-        exit;
+
+        flashExito('Sesión iniciada correctamente');
+        redir('controller=Equipos&action=index');
     }
 
     /**
@@ -68,13 +80,12 @@ class AuthController extends Controller {
      */
     public function register(): void {
         if (isset($_SESSION['usuario_id'])) {
-            header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
-            exit;
+            redir('controller=Equipos&action=index');
         }
-        
+
         $old = $_SESSION['old'] ?? [];
         unset($_SESSION['old']);
-        
+
         $this->view('auth/register', [
             'titulo' => 'Registrarse',
             'old' => $old
@@ -85,69 +96,71 @@ class AuthController extends Controller {
      * Procesa registro
      */
     public function guardarRegistro(): void {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . '?controller=Auth&action=register');
-            exit;
-        }
-        
-        $nombre = trim($_POST['nombre'] ?? '');
-        $email = trim(strtolower($_POST['email'] ?? ''));
-        $password = $_POST['password'] ?? '';
-        $confirmar = $_POST['confirmar'] ?? '';
-        
+        exigirPost('controller=Auth&action=register');
+
+        $nombre   = trim(post('nombre'));
+        $email    = strtolower(trim(post('email')));
+        $password = post('password');
+        $confirmar = post('confirmar');
+
         $_SESSION['old'] = [
             'nombre' => $nombre,
-            'email' => $email
+            'email'  => $email,
         ];
-        
-        if (empty($nombre) || empty($email) || empty($password) || empty($confirmar)) {
-            $_SESSION['error'] = 'Todos los campos son obligatorios';
-            header('Location: ' . BASE_URL . '?controller=Auth&action=register');
-            exit;
+
+        $volver = 'controller=Auth&action=register';
+
+        if ($nombre === '' || $email === '' || $password === '' || $confirmar === '') {
+            flashError('Todos los campos son obligatorios');
+            redir($volver);
         }
-        
+
+        if (!cabeEnColumna($nombre, MAX_NOMBRE)) {
+            flashError('El nombre no puede superar los ' . MAX_NOMBRE . ' caracteres');
+            redir($volver);
+        }
+
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $_SESSION['error'] = 'Email no válido';
-            header('Location: ' . BASE_URL . '?controller=Auth&action=register');
-            exit;
+            flashError('Email no válido');
+            redir($volver);
         }
-        
+
         if ($password !== $confirmar) {
-            $_SESSION['error'] = 'Las contraseñas no coinciden';
-            header('Location: ' . BASE_URL . '?controller=Auth&action=register');
-            exit;
+            flashError('Las contraseñas no coinciden');
+            redir($volver);
         }
-        
+
         if (strlen($password) < 6) {
-            $_SESSION['error'] = 'La contraseña debe tener al menos 6 caracteres';
-            header('Location: ' . BASE_URL . '?controller=Auth&action=register');
-            exit;
+            flashError('La contraseña debe tener al menos 6 caracteres');
+            redir($volver);
         }
-        
-        require_once '../app/models/Usuario.php';
+
+        require_once __DIR__ . '/../models/Usuario.php';
         $usuarioModel = new Usuario();
-        
+
         if ($usuarioModel->existeEmail($email)) {
-            $_SESSION['error'] = 'El email ya está registrado';
-            header('Location: ' . BASE_URL . '?controller=Auth&action=register');
-            exit;
+            flashError('El email ya está registrado');
+            redir($volver);
         }
-        
+
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $usuarioModel->crear($nombre, $email, $hash);
-        
+
         unset($_SESSION['old']);
-        $_SESSION['exito'] = 'Registro exitoso. Ahora puedes iniciar sesión';
-        header('Location: ' . BASE_URL . '?controller=Auth&action=index');
-        exit;
+        flashExito('Registro exitoso. Ahora puedes iniciar sesión');
+        redir('controller=Auth&action=index');
     }
 
     /**
      * Cierra sesión
      */
     public function logout(): void {
+        // Antes se podía cerrar la sesión con un simple enlace GET, lo que
+        // permitía que un sitio ajeno cerrara la sesión del usuario.
+        exigirPost('controller=Auth&action=index');
+
         $_SESSION = [];
-        
+
         if (ini_get("session.use_cookies")) {
             $params = session_get_cookie_params();
             setcookie(session_name(), '', time() - 42000,
@@ -157,9 +170,49 @@ class AuthController extends Controller {
                 $params["httponly"]
             );
         }
-        
+
         session_destroy();
-        header('Location: ' . BASE_URL . '?controller=Auth&action=index');
-        exit;
+        redir('controller=Auth&action=index');
     }
+}
+
+/**
+ * Suma un intento fallido y bloquea la cuenta temporalmente si son muchos.
+ *
+ * Sin esto, un atacante podía probar miles de contraseñas por segundo.
+ *
+ * @return void
+ */
+function registrarIntentoFallido(): void {
+    $ahora = time();
+    $intentos = $_SESSION['login_fallidos'] ?? [];
+
+    // Se descartan los intentos de hace más de 15 minutos.
+    $intentos = array_filter($intentos, static fn($t) => ($ahora - (int)$t) < 900);
+
+    $intentos[] = $ahora;
+    $_SESSION['login_fallidos'] = $intentos;
+}
+
+/**
+ * Indica si la cuenta está bloqueada por intentos fallidos.
+ *
+ * @return bool
+ */
+function loginBloqueado(): bool {
+    $ahora = time();
+    $intentos = array_filter(
+        $_SESSION['login_fallidos'] ?? [],
+        static fn($t) => ($ahora - (int)$t) < 900
+    );
+    return count($intentos) >= 5;
+}
+
+/**
+ * Limpia el contador tras un login correcto.
+ *
+ * @return void
+ */
+function limpiarIntentosFallidos(): void {
+    unset($_SESSION['login_fallidos']);
 }

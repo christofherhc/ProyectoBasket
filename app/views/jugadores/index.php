@@ -28,7 +28,12 @@
                     <td><?= htmlspecialchars($jugador['nombre_equipo'] ?? '-') ?></td>
                     <td>
                         <a href="<?= BASE_URL ?>?controller=Jugadores&action=editar&id=<?= $jugador['id'] ?>" class="btn btn-secondary">Editar</a>
-                        <a href="<?= BASE_URL ?>?controller=Jugadores&action=eliminar&id=<?= $jugador['id'] ?>" class="btn btn-danger" onclick="return confirm('¿Eliminar este jugador?');">Eliminar</a>
+                                                <form action="<?= BASE_URL ?>?controller=Jugadores&action=eliminar" method="POST" class="inline-form"
+                              onsubmit="return confirm('¿Eliminar este jugador?');">
+                            <?= csrfCampo() ?>
+                            <input type="hidden" name="id" value="<?= $jugador['id'] ?>">
+                            <button type="submit" class="btn btn-danger">Eliminar</button>
+                        </form>
                     </td>
                 </tr>
             <?php endforeach; ?>

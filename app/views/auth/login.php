@@ -1,6 +1,7 @@
 <h1>Iniciar Sesión</h1>
 
 <form action="<?= BASE_URL ?>?controller=Auth&action=login" method="POST">
+    <?= csrfCampo() ?>
     <div class="form-group">
         <label for="email">Email</label>
         <input type="email" id="email" name="email" required autocomplete="email">

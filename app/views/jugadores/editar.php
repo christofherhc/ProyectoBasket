@@ -1,6 +1,7 @@
 <h1>Editar Jugador</h1>
 
 <form action="<?= BASE_URL ?>?controller=Jugadores&action=actualizar" method="POST">
+    <?= csrfCampo() ?>
     <input type="hidden" name="id" value="<?= htmlspecialchars((string)$jugador['id']) ?>">
 
     <div class="form-group">

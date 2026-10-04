@@ -286,7 +286,7 @@ La lógica de "quién ganó" **no está en el controlador ni en el modelo**: est
 | 3 | `$puntosLocal = (int)($_POST[...] ?? 0)` no distingue "vacío" de "0" | Baja | Usar `?? ''` y comprobar con `=== ''` |
 | 4 | `actualizar()` redirige a sitios distintos según el error | Baja | Redirigir siempre al formulario |
 | 5 | Mensajes genéricos ("Datos inválidos") | Baja | Especificar qué campo |
-| 6 | ⚠️ `confirm()` del cliente no protege nada en servidor | Baja | Formulario POST real |
+| 6 | ⚠️ `confirm()` del cliente no protegía nada en servidor | Baja | **Resuelto:** formulario POST con token CSRF |
 | 7 | No se comprueba que exista el partido en `actualizar()` | Baja | `obtenerPorId()` antes |
 
 ⚠️ **La 1 es la que más vas a notar.** Intenta registrar un partido eligiendo en el desplegable un equipo que hayas borrado antes (o manipulando la URL con un id inexistente) y verás un error de SQL.

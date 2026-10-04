@@ -7,7 +7,7 @@ class EquiposController extends Controller {
     private Equipo $equipoModel;
 
     public function __construct() {
-        require_once '../app/models/Equipo.php';
+        require_once __DIR__ . '/../models/Equipo.php';
         $this->equipoModel = new Equipo();
     }
 
@@ -32,42 +32,19 @@ class EquiposController extends Controller {
 
     public function guardar(): void {
         $this->requiereLogin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . '?controller=Equipos&action=crear');
-            exit;
-        }
+        exigirPost('controller=Equipos&action=crear');
 
-        $nombre = trim($_POST['nombre'] ?? '');
-        $ciudad = trim($_POST['ciudad'] ?? '');
-        $fundacion = $_POST['fundacion'] ?? '';
+        [$nombre, $ciudad, $fundacionInt, $errores] = $this->validarCampos();
 
-        $_SESSION['old_equipo'] = [
-            'nombre' => $nombre,
-            'ciudad' => $ciudad,
-            'fundacion' => $fundacion
-        ];
-
-        if (empty($nombre) || empty($ciudad)) {
-            $_SESSION['error'] = 'Nombre y ciudad son obligatorios';
-            header('Location: ' . BASE_URL . '?controller=Equipos&action=crear');
-            exit;
-        }
-
-        $fundacionInt = null;
-        if ($fundacion !== '') {
-            $fundacionInt = (int)$fundacion;
-            if ($fundacionInt < 1800 || $fundacionInt > (int)date('Y')) {
-                $_SESSION['error'] = 'Año de fundación no válido';
-                header('Location: ' . BASE_URL . '?controller=Equipos&action=crear');
-                exit;
-            }
+        if ($errores !== []) {
+            flashError(implode(' ', $errores));
+            redir('controller=Equipos&action=crear');
         }
 
         $this->equipoModel->crear($nombre, $ciudad, $fundacionInt);
         unset($_SESSION['old_equipo']);
-        $_SESSION['exito'] = 'Equipo creado correctamente';
-        header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
-        exit;
+        flashExito('Equipo creado correctamente');
+        redir('controller=Equipos&action=index');
     }
 
     public function editar(array $params): void {
@@ -75,9 +52,8 @@ class EquiposController extends Controller {
         $id = (int)($params['id'] ?? 0);
         $equipo = $this->equipoModel->obtenerPorId($id);
         if ($equipo === null) {
-            $_SESSION['error'] = 'Equipo no encontrado';
-            header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
-            exit;
+            flashError('Equipo no encontrado');
+            redir('controller=Equipos&action=index');
         }
         $old = $_SESSION['old_equipo'] ?? [];
         unset($_SESSION['old_equipo']);
@@ -90,55 +66,162 @@ class EquiposController extends Controller {
 
     public function actualizar(): void {
         $this->requiereLogin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
-            exit;
+        exigirPost('controller=Equipos&action=index');
+
+        $id = (int)post('id');
+        [$nombre, $ciudad, $fundacionInt, $errores] = $this->validarCampos();
+
+        if ($errores === []) {
+            $errores = $this->validarId($id, 'equipo');
         }
 
-        $id = (int)($_POST['id'] ?? 0);
-        $nombre = trim($_POST['nombre'] ?? '');
-        $ciudad = trim($_POST['ciudad'] ?? '');
-        $fundacion = $_POST['fundacion'] ?? '';
+        // Los errores de un formulario de edición deben devolver al formulario,
+        // no al listado: si no, el usuario pierde todo lo que había escrito.
+        $volver = 'controller=Equipos&action=editar&id=' . $id;
 
-        $_SESSION['old_equipo'] = [
-            'nombre' => $nombre,
-            'ciudad' => $ciudad,
-            'fundacion' => $fundacion
-        ];
-
-        if (empty($nombre) || empty($ciudad) || $id <= 0) {
-            $_SESSION['error'] = 'Datos inválidos para actualizar equipo';
-            header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
-            exit;
+        if ($errores !== []) {
+            flashError(implode(' ', $errores));
+            redir($volver);
         }
 
-        $fundacionInt = null;
-        if ($fundacion !== '') {
-            $fundacionInt = (int)$fundacion;
-            if ($fundacionInt < 1800 || $fundacionInt > (int)date('Y')) {
-                $_SESSION['error'] = 'Año de fundación no válido';
-                header('Location: ' . BASE_URL . '?controller=Equipos&action=editar&id=' . $id);
-                exit;
-            }
+        if (!$this->equipoModel->actualizar($id, $nombre, $ciudad, $fundacionInt)) {
+            flashError('No se encontró el equipo que se quiso modificar');
+            redir('controller=Equipos&action=index');
         }
 
-        $this->equipoModel->actualizar($id, $nombre, $ciudad, $fundacionInt);
         unset($_SESSION['old_equipo']);
-        $_SESSION['exito'] = 'Equipo actualizado correctamente';
-        header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
-        exit;
+        flashExito('Equipo actualizado correctamente');
+        redir('controller=Equipos&action=index');
     }
 
     public function eliminar(array $params): void {
         $this->requiereLogin();
-        $id = (int)($params['id'] ?? 0);
-        if ($id > 0) {
-            $this->equipoModel->eliminar($id);
-            $_SESSION['exito'] = 'Equipo eliminado correctamente';
-        } else {
-            $_SESSION['error'] = 'ID de equipo inválido';
+        exigirPost('controller=Equipos&action=index');
+
+        $id = (int)post('id');
+
+        if ($id <= 0) {
+            flashError('ID de equipo inválido');
+            redir('controller=Equipos&action=index');
         }
-        header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
-        exit;
+
+        // Se informa del bloqueo antes de intentar el DELETE para poder
+        // dar un mensaje concreto en lugar de la pantalla en blanco del error 1451.
+        $dependientes = $this->contarDependientes($id);
+        if ($dependientes['jugadores'] > 0 || $dependientes['partidos'] > 0) {
+            flashError(
+                'No se puede eliminar "' . $this->nombreEquipo($id) . '": tiene '
+                . $dependientes['jugadores'] . ' jugador(es) y '
+                . $dependientes['partidos'] . ' partido(s) registrados.'
+            );
+            redir('controller=Equipos&action=index');
+        }
+
+        if (!$this->equipoModel->eliminar($id)) {
+            flashError('No se encontró el equipo que se quiso eliminar');
+            redir('controller=Equipos&action=index');
+        }
+
+        flashExito('Equipo eliminado correctamente');
+        redir('controller=Equipos&action=index');
+    }
+
+    /**
+     * Valida los campos del formulario de equipo.
+     *
+     * @return array [nombre, ciudad, fundacion, errores]
+     */
+    private function validarCampos(): array {
+        $nombre    = trim(post('nombre'));
+        $ciudad    = trim(post('ciudad'));
+        $fundacion = trim(post('fundacion'));
+
+        // Se guardan para repoblar el formulario tras un error.
+        $_SESSION['old_equipo'] = [
+            'nombre'    => $nombre,
+            'ciudad'    => $ciudad,
+            'fundacion' => $fundacion,
+        ];
+
+        $errores = [];
+
+        if ($nombre === '') {
+            $errores[] = 'El nombre es obligatorio';
+        } elseif (!cabeEnColumna($nombre, MAX_NOMBRE)) {
+            $errores[] = 'El nombre no puede superar los ' . MAX_NOMBRE . ' caracteres';
+        }
+
+        if ($ciudad === '') {
+            $errores[] = 'La ciudad es obligatoria';
+        } elseif (!cabeEnColumna($ciudad, MAX_CIUDAD)) {
+            $errores[] = 'La ciudad no puede superar los ' . MAX_CIUDAD . ' caracteres';
+        }
+
+        $fundacionInt = null;
+        if ($fundacion !== '') {
+            if (!ctype_digit($fundacion)) {
+                $errores[] = 'El año de fundación debe ser un número entero';
+            } else {
+                $fundacionInt = (int)$fundacion;
+                if ($fundacionInt < 1800 || $fundacionInt > (int)date('Y')) {
+                    $errores[] = 'El año de fundación debe estar entre 1800 y ' . date('Y');
+                }
+            }
+        }
+
+        return [$nombre, $ciudad, $fundacionInt, $errores];
+    }
+
+    /**
+     * Comprueba que un id sea válido y que el registro exista.
+     *
+     * @param int    $id
+     * @param string $nombre
+     * @return array Lista de errores (vacía si todo está bien)
+     */
+    private function validarId(int $id, string $nombre): array {
+        if ($id <= 0) {
+            return ['ID de ' . $nombre . ' inválido'];
+        }
+        if ($this->equipoModel->obtenerPorId($id) === null) {
+            return ['No se encontró el ' . $nombre . ' que se quiso modificar'];
+        }
+        return [];
+    }
+
+    /**
+     * Cuenta los registros que impiden borrar un equipo.
+     *
+     * @param int $id
+     * @return array [jugadores, partidos]
+     */
+    private function contarDependientes(int $id): array {
+        $db = Database::getConexion();
+        $stmt = $db->prepare(
+            'SELECT
+                (SELECT COUNT(*) FROM jugadores WHERE equipo_id = :a) AS jugadores,
+                (SELECT COUNT(*) FROM partidos
+                  WHERE equipo_local_id = :b OR equipo_visitante_id = :c) AS partidos'
+        );
+        $stmt->bindValue(':a', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':b', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':c', $id, PDO::PARAM_INT);
+        $stmt->execute();
+        $fila = $stmt->fetch() ?: ['jugadores' => 0, 'partidos' => 0];
+        return [
+            'jugadores' => (int)$fila['jugadores'],
+            'partidos'  => (int)$fila['partidos'],
+        ];
+    }
+
+    /**
+     * Nombre del equipo, para poder mencionarlo en el mensaje de error.
+     *
+     * @param int $id
+     * @return string
+     */
+    private function nombreEquipo(int $id): string {
+        $equipo = $this->equipoModel->obtenerPorId($id);
+        return $equipo['nombre'] ?? ('#' . $id);
     }
 }

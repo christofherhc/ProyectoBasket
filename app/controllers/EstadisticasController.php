@@ -5,32 +5,29 @@
  */
 class EstadisticasController extends Controller {
     private Partido $partidoModel;
+    private Equipo $equipoModel;
 
     public function __construct() {
-        require_once '../app/models/Partido.php';
+        require_once __DIR__ . '/../models/Partido.php';
+        require_once __DIR__ . '/../models/Equipo.php';
         $this->partidoModel = new Partido();
+        $this->equipoModel = new Equipo();
     }
 
     public function index(): void {
         $this->requiereLogin();
-        
-        // Obtener todos los partidos con nombres
+
         $partidos = $this->partidoModel->obtenerTodos();
-        
-        // Mapa de equipos: id => nombre
-        $equiposMap = [];
-        foreach ($partidos as $p) {
-            $equiposMap[$p['equipo_local_id']] = $p['nombre_local'];
-            $equiposMap[$p['equipo_visitante_id']] = $p['nombre_visitante'];
-        }
-        
-        // Calcular estadísticas por equipo
+
+        // Se parte de TODOS los equipos, no solo de los que aparecen en un
+        // partido. Antes el mapa se armaba desde los partidos, así que un
+        // equipo recién creado y sin partidos desaparecía de la tabla.
         $stats = [];
-        foreach (array_unique(array_keys($equiposMap)) as $eid) {
-            $eidInt = (int)$eid;
-            $stats[$eidInt] = [
-                'equipo_id' => $eidInt,
-                'nombre' => $equiposMap[$eidInt] ?? '',
+        foreach ($this->equipoModel->obtenerTodos() as $equipo) {
+            $eid = (int)$equipo['id'];
+            $stats[$eid] = [
+                'equipo_id' => $eid,
+                'nombre'    => $equipo['nombre'],
                 'pj' => 0,
                 'pg' => 0,
                 'pe' => 0,
@@ -40,18 +37,18 @@ class EstadisticasController extends Controller {
                 'dif' => 0
             ];
         }
-        
+
         // Procesar partidos
         foreach ($partidos as $p) {
             $el = (int)$p['equipo_local_id'];
             $ev = (int)$p['equipo_visitante_id'];
             $pl = (int)$p['puntos_local'];
             $pv = (int)$p['puntos_visitante'];
-            
+
             if (!isset($stats[$el]) || !isset($stats[$ev])) {
                 continue;
             }
-            
+
             // PJ
             $stats[$el]['pj']++;
             $stats[$ev]['pj']++;
@@ -60,7 +57,7 @@ class EstadisticasController extends Controller {
             $stats[$el]['gc'] += $pv;
             $stats[$ev]['gf'] += $pv;
             $stats[$ev]['gc'] += $pl;
-            
+
             // Resultado
             if ($pl > $pv) {
                 $stats[$el]['pg']++;
@@ -73,12 +70,12 @@ class EstadisticasController extends Controller {
                 $stats[$ev]['pe']++;
             }
         }
-        
+
         // Calcular diferencia
         foreach ($stats as $k => $v) {
             $stats[$k]['dif'] = $v['gf'] - $v['gc'];
         }
-        
+
         // Ordenar por PG desc, DIF desc
         usort($stats, function ($a, $b) {
             if ($a['pg'] !== $b['pg']) {
@@ -86,7 +83,7 @@ class EstadisticasController extends Controller {
             }
             return $b['dif'] <=> $a['dif'];
         });
-        
+
         $this->view('estadisticas/index', [
             'titulo' => 'Estadísticas de la Liga',
             'stats' => $stats,

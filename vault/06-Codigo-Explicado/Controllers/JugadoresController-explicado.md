@@ -213,7 +213,7 @@ $id = (int)($_POST['id'] ?? 0);
 if (empty($nombre) || $equipoId <= 0 || $id <= 0) { ... }
 ```
 
-**Las mismas limitaciones que en EquiposController:** no comprueba que el jugador exista, y `eliminar()` no maneja el error de clave foránea (aunque `jugadores` **no tiene** referencias hacia otras tablas, así que borrar un jugador nunca falla por FK; es el único de los tres módulos donde `eliminar()` es seguro).
+**Las mismas protecciones que en EquiposController:** el borrado es por POST con token CSRF, `validarId()` comprueba que el jugador exista y la posición se contrasta contra la lista blanca `POSICIONES`. Este CRUD **no** suffered el error 1451 porque `jugadores` no es la tabla padre de ninguna FK, así que nunca hubo que gestionar el borrado bloqueado (aunque `jugadores` **no tiene** referencias hacia otras tablas, así que borrar un jugador nunca falla por FK; es el único de los tres módulos donde `eliminar()` es seguro).
 
 ## 7. Cómo se ve la relación en el listado
 
@@ -257,7 +257,7 @@ porque un nombre con `<` rompería el HTML. Está verificado con un usuario llam
 | 2 | No se valida la unicidad del número por equipo | Media | Consulta con `ignorarId` al editar |
 | 3 | `actualizar()` no comprueba que exista el jugador | Baja | `obtenerPorId()` antes |
 | 4 | No se valida `strlen($nombre) > 100` | Baja | Validar en PHP |
-| 5 | ⚠️ `confirm()` del cliente no protege nada en servidor | Baja | Formulario POST real |
+| 5 | ⚠️ `confirm()` del cliente no protegía nada en servidor | Baja | **Resuelto:** formulario POST con token CSRF |
 
 ⚠️ **La 2 es un bug de datos real:** puedes crear dos jugadores con la camiseta 23 en el mismo equipo, y el listado los mostrará sin avisar de nada.
 

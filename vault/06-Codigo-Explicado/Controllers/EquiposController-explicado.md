@@ -279,57 +279,89 @@ public function eliminar(array $params): void {
 
 **`$id > 0` en lugar de validar cada caso.** Es una forma compacta de decir "si el id es un entero positivo, borra; si no, avisa".
 
-### ⚠️ Tres limitaciones reales de este método
+### ✅ Cómo quedó este método tras la auditoría
 
-**a) Eliminar por GET.** El enlace del listado es un `<a href="...&action=eliminar&id=3">`. Un `GET` puede ejecutarse sin querer (un clic accidental, un "restaurar página" en el caché del navegador) y **no se puede proteger con CSRF**, porque los tokens se envían en el cuerpo del POST, no en la URL.
+Estas tres limitaciones **estaban** y ya no están. Se conservan aquí porque el arreglo es la parte importante.
 
-La forma correcta es un formulario con `<input type="hidden" name="_method" value="DELETE">` o un formulario POST con JavaScript que confirme:
+**a) El borrado ya es por POST con token CSRF.** El enlace del listado se sustituyó por un formulario:
 
 ```html
-<form method="post" action="?controller=Equipos&action=eliminar" onsubmit="return confirm('¿Eliminar?')">
-    <input type="hidden" name="id" value="3">
+<form action="<?= BASE_URL ?>?controller=Equipos&action=eliminar" method="POST" class="inline-form"
+      onsubmit="return confirm('¿Eliminar este equipo?');">
+    <?= csrfCampo() ?>
+    <input type="hidden" name="id" value="<?= $equipo['id'] ?>">
     <button type="submit" class="btn btn-danger">Eliminar</button>
 </form>
 ```
 
-⚠️ **Las dos limitaciones más importantes, y no son culpa del código de este proyecto:**
+Y el controlador empieza con `exigirPost()`, que corta la petición si no es POST o si el token no cuadra:
 
-**b) ⚠️ La confirmación es del lado del cliente.** El enlace lleva `onclick="return confirm('¿Eliminar este equipo?')"`, así que el navegador pregunta antes de ir. Eso mejora la usabilidad, **pero no es seguridad**: `confirm()` se puede esquivar con `curl`, o con JavaScript en la consola. El servidor borra sin preguntar.
+```php
+public function eliminar(array $params): void {
+    $this->requiereLogin();
+    exigirPost('controller=Equipos&action=index');
+    $id = (int)post('id');
+```
 
-**c) ⚠️ No se maneja el error de clave foránea.** Este es el punto más delicado. El `equipos` tiene `ON DELETE RESTRICT` en sus dos referencias, así que:
+Un `?controller=Equipos&action=eliminar&id=1` a pelo ahora **redirige sin borrar nada**, y un POST sin token se rechaza con HTTP 403.
+
+⚠️ **`confirm()` sigue siendo solo comodidad.** Sigue estando en el `onsubmit`, pero ya no es lo único que protege: aunque alguien lo desactive, la petición es un POST con un token válido que el servidor exige. Antes el borrado ocurría igual; hoy depende de protecciones reales.
+
+**b) El borrado con clave foránea ya no da pantalla en blanco.** Este era el punto más delicado del proyecto. `equipos` tiene `ON DELETE RESTRICT` en sus dos referencias, así que:
 
 ```sql
 DELETE FROM equipos WHERE id = 1;   -- si tiene 3 jugadores
--- ERROR 1451: Cannot delete or update a parent row:
--- a foreign key constraint fails
+-- ERROR 1451: Cannot delete or update a parent row
 ```
 
-El modelo llama a `execute()` con `ERRMODE_EXCEPTION`, así que la excepción **sube** y el usuario ve una pantalla de error de PHP en vez de un mensaje amable.
+Con `ERRMODE_EXCEPTION` la excepción subía hasta `index.php`, que no tenía ningún `try/catch`, y el usuario veía una página vacía. **Era el error más probable al probar el proyecto**: los 4 equipos de `seeds.sql` tienen jugadores, así que el primer "Eliminar" que se pulsaba fallaba.
 
-**Este es el error más probable que te encuentres al probar el proyecto:** intenta borrar un equipo que tenga jugadores (los 4 equipos de `seeds.sql` los tienen) y verás el error.
+Se resolvió por dos capas:
 
-Las dos formas de arreglarlo:
+**Capa 1 — avisar antes de intentarlo** (la que el usuario ve):
 
-**Opción A — Comprobar antes de borrar (la más clara):**
 ```php
-if ($this->equipoModel->tieneJugadores($id)) {
-    $_SESSION['error'] = 'No se puede eliminar: el equipo tiene jugadores o partidos registrados';
-    header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
-    exit;
+$dependientes = $this->contarDependientes($id);
+if ($dependientes['jugadores'] > 0 || $dependientes['partidos'] > 0) {
+    flashError(
+        'No se puede eliminar "' . $this->nombreEquipo($id) . '": tiene '
+        . $dependientes['jugadores'] . ' jugador(es) y '
+        . $dependientes['partidos'] . ' partido(s) registrados.'
+    );
+    redir('controller=Equipos&action=index');
 }
 ```
 
-**Opción B — Capturar la excepción:**
 ```php
-try {
-    $this->equipoModel->eliminar($id);
-    $_SESSION['exito'] = 'Equipo eliminado correctamente';
-} catch (PDOException $e) {
-    $_SESSION['error'] = 'No se puede eliminar el equipo porque tiene registros relacionados';
+private function contarDependientes(int $id): array {
+    $db = Database::getConexion();
+    $stmt = $db->prepare(
+        'SELECT
+            (SELECT COUNT(*) FROM jugadores WHERE equipo_id = :a) AS jugadores,
+            (SELECT COUNT(*) FROM partidos
+              WHERE equipo_local_id = :b OR equipo_visitante_id = :c) AS partidos'
+    );
+    // ... bindValue de los tres parámetros
 }
 ```
 
-⚠️ **Este proyecto NO implementa ninguna de las dos.** Es una funcionalidad pendiente que conviene añadir. Documentado aquí porque es el error más fácil de encontrar al usar la aplicación.
+⚠️ **Una consulta con dos `SELECT COUNT(*)` dentro y `FOREIGN KEY` intacta.** Comprobar antes tiene una limitación real: entre la comprobación y el borrado otro proceso podría insertar. Por eso hace falta la segunda capa.
+
+**Capa 2 — un manejador global de excepciones.** `public/index.php` registra `set_exception_handler('manejarExcepcion')`, que traduce los códigos de MySQL a un mensaje entendible:
+
+| Código | Significado | Mensaje que ve el usuario |
+|---|---|---|
+| 1451 | FK `RESTRICT` | "No se puede eliminar: tiene datos asociados" |
+| 1452 | FK inexistente | "El registro seleccionado no existe" |
+| 1406 | Texto demasiado largo | "Algún texto es más largo de lo permitido" |
+| 1292 | Fecha inválida | "La fecha indicada no es válida" |
+| 1264 | Número fuera de rango | "Un número está fuera de rango" |
+| 1062 | Duplicado | "Ya existe un registro con esos datos" |
+
+⚠️ **El manejador nunca imprime el mensaje de MySQL.** Ese texto incluye nombres de tablas y columnas; mostrárselo a un visitante es filtrar información interna. Se registra con `error_log()` y al usuario se le enseña la traducción.
+
+⚠️ **Con la validación en sitio, el manejador no debería aparecer nunca.** Es la red de seguridad: si mañana alguien añade una consulta que no valida, el usuario recibe un 409 con un mensaje razonable en vez de una pantalla en blanco.
+
 
 ## 9. El patrón a memorizar
 
@@ -356,14 +388,17 @@ public function guardar(): void {
 
 ## 10. Limitaciones conocidas de este controlador
 
-| # | Limitación | Gravedad | Arreglo |
+| # | Limitación (ya resueltas) | Gravedad | Arreglo aplicado |
 |---|---|---|---|
-| 1 | Borrar un equipo con jugadores/partidos da error de FK sin capturar | **Alta** | Comprobar antes o capturar `PDOException` |
-| 2 | ⚠️ Eliminar por GET (la confirmación es solo del cliente) | Media | Formulario POST: más seguro y CSRF-protegible |
-| 3 | `actualizar()` no comprueba que el equipo exista | Baja | Llamar a `obtenerPorId()` antes |
-| 4 | No se valida `strlen($nombre) > 100` | Baja | Validar en PHP |
-| 5 | No se comprueba que el nombre esté repetido | Baja | Añadir `UNIQUE` o una consulta |
-| 6 | `die()` sin escapar en el Router | Baja | `htmlspecialchars()` en los mensajes |
+| 1 | Borrar un equipo con jugadores/partidos daba error de FK sin capturar | **Alta** | `contarDependientes()` avisa antes; además `manejarExcepcion()` como red de seguridad |
+| 2 | Eliminar por GET, sin token CSRF | Media | Formulario POST + `exigirPost()` |
+| 3 | `actualizar()` no comprobaba que el equipo exista | Baja | `validarId()` en el controlador + comprobación de existencia en el modelo |
+| 4 | No se validaba la longitud de los textos | Baja | `cabeEnColumna()` contra `MAX_NOMBRE` / `MAX_CIUDAD` |
+| 5 | `fundacion=abc` se convertía en un año basura | Baja | `ctype_digit()` antes de convertir |
+| 6 | `die()` sin escapar en el Router | Baja | El Router ya no imprime el dato; usa `error()` con 404 |
+| 7 | Sin rate limit en el login | Media | Bloqueo tras 5 intentos en 15 minutos |
+
+⚠️ **Lo que sigue abierto a propósito:** el nombre de equipo **no** es único. Dos equipos pueden llamarse "Real Madrid". No se añade `UNIQUE` porque el enunciado no lo pide y en una liga real puede haber equipos con el mismo nombre en ciudades distintas. Si algún día lo necesitas, es un `ALTER TABLE equipos ADD UNIQUE (nombre)`.
 
 ---
 

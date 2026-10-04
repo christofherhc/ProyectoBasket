@@ -23,12 +23,12 @@ Todos los errores reales que aparecieron al construir y verificar este proyecto.
 | [13](#13-rutas-relativas-al-cargar-el-layout) | `Failed to open stream` | Medio |
 | [14](#14-las-pruebas-daban-fallos-pero-la-aplicación-sí-funcionaba) | Falsos negativos en las pruebas | Interesante |
 | [15](#15-la-base-de-datos-de-la-última-verificación-quedó-con-datos-de-prueba) | Datos sucios entre ejecuciones | Interesante |
-| [16](#16-el-borrado-de-un-equipo-con-jugadores-daba-pantalla-en-blanco) | Borrar equipo con jugadores o partidos | Crítico |
-| [17](#17-el-router-reflejaba-html-en-el-mensaje-de-error) | XSS reflejado en `?controller=` | Crítico |
-| [18](#18-la-redirección-usaba-el-header-host) | `Location:` con host ajeno | Alto |
-| [19](#19-los-campos-enviados-como-array-provocaban-500) | `nombre[]=x` -> HTTP 500 | Alto |
-| [20](#20-los-datos-inválidos-provocaban-500) | Exceso de longitud, fecha o FK inválida | Alto |
-| [21](#21-la-base-no-restringía-posiciones-ni-dorsales) | `posicion=ADMIN` y dorsales duplicados | Medio |
+| [16](#16-el-borrado-de-un-equipo-con-jugadores-daba-pantalla-en-blanco) | Borrar equipo con jugadores o partidos | ✅ Resuelto |
+| [17](#17-el-router-reflejaba-html-en-el-mensaje-de-error) | XSS reflejado en `?controller=` | ✅ Resuelto |
+| [18](#18-la-redirección-usaba-el-header-host) | `Location:` con host ajeno | ✅ Resuelto |
+| [19](#19-los-campos-enviados-como-array-provocaban-500) | `nombre[]=x` -> HTTP 500 | ✅ Resuelto |
+| [20](#20-los-datos-inválidos-provocaban-500) | Exceso de longitud, fecha o FK inválida | ✅ Resuelto |
+| [21](#21-la-base-no-restringía-posiciones-ni-dorsales) | `posicion=ADMIN` y dorsales duplicados | ✅ Resuelto |
 
 ---
 
@@ -446,7 +446,7 @@ y ejecutar la suite completa después. Así el resultado es idéntico en la segu
 
 ---
 
-## 16. El borrado de un equipo con jugadores daba pantalla en blanco
+## 16. ✅ El borrado de un equipo con jugadores daba pantalla en blanco
 
 **Error:** al pulsar "Eliminar" en un equipo con jugadores o partidos, el navegador muestra una página vacía (HTTP 500).
 
@@ -456,7 +456,7 @@ y ejecutar la suite completa después. Así el resultado es idéntico en la segu
 SQLSTATE[23000]: Integrity constraint violation: 1451 Cannot delete or update a parent row
 ```
 
-**Solución (pendiente de aplicar):** envolver la llamada en `try/catch` y comprobar el código 1451, o avisar antes:
+**✅ Solución aplicada:** envolver la llamada en `try/catch` y comprobar el código 1451, o avisar antes:
 
 ```php
 try {
@@ -472,13 +472,13 @@ Alternativa más limpia: contar los dependientes antes de borrar y mostrar un av
 
 ---
 
-## 17. El Router reflejaba HTML en el mensaje de error
+## 17. ✅ El Router reflejaba HTML en el mensaje de error
 
 **Error:** al pedir `index.php?controller=<script>alert(1)</script>`, el navegador ejecuta JavaScript.
 
 **Causa:** `Router::cargarController()` compone el mensaje de error con `$nombreClase`, que viene de la URL sin escapar, y lo imprime con `die()`.
 
-**Solución (pendiente de aplicar):** escapar en la salida **o**, mejor, no imprimir el nombre del archivo en absoluto:
+**✅ Solución aplicada:** escapar en la salida **o**, mejor, no imprimir el nombre del archivo en absoluto:
 
 ```php
 die('Error: controlador no encontrado.');           // lo ideal
@@ -490,7 +490,7 @@ die('Error: controlador no encontrado: '
 
 ---
 
-## 18. La redirección usaba el header Host
+## 18. ✅ La redirección usaba el header Host
 
 **Error:** con `Host: evil.example.com`, la respuesta devuelve `Location: http://evil.example.com/...`.
 
@@ -501,7 +501,7 @@ $ curl -H 'Host: evil.example.com' 'http://localhost/.../?controller=Auth&action
 Location: http://evil.example.com/ProyectoBasket-Deploy/public/?controller=Auth&action=register
 ```
 
-**Solución (pendiente de aplicar):** no derivar la URL pública del request. Definirla a mano:
+**✅ Solución aplicada:** no derivar la URL pública del request. Definirla a mano:
 
 ```php
 define('BASE_URL', '/ProyectoBasket-Deploy/public');  // ruta, no dominio
@@ -511,13 +511,13 @@ Si hace falta dominio, validar `HTTP_HOST` contra una lista blanca. Mientras tan
 
 ---
 
-## 19. Los campos enviados como array provocaban 500
+## 19. ✅ Los campos enviados como array provocaban 500
 
 **Error:** `POST` con `nombre[]=x` o `email[]=x` devuelve HTTP 500.
 
 **Causa:** `trim()` y `strtolower()` reciben un array. En PHP 8 eso es un `TypeError`: la función espera `string`. La misma causa está en el Router con `?controller[]=x`.
 
-**Solución (pendiente de aplicar):** comprobar el tipo antes de usar el valor.
+**✅ Solución aplicada:** comprobar el tipo antes de usar el valor.
 
 ```php
 $nombre = isset($_POST['nombre']) && is_string($_POST['nombre'])
@@ -537,7 +537,7 @@ if (!in_array($nombre, $permitidos, true)) {
 
 ---
 
-## 20. Los datos inválidos provocaban 500
+## 20. ✅ Los datos inválidos provocaban 500
 
 **Error:** introducir datos demasiado largos, una fecha no válida o un `equipo_id` inexistente devuelve HTTP 500.
 
@@ -550,7 +550,7 @@ if (!in_array($nombre, $permitidos, true)) {
 | Fecha como `31/12/2026` | `Incorrect datetime value` | 1292 |
 | Puntos fuera de `INT UNSIGNED` | `Out of range value` | 1264 |
 
-**Solución (pendiente de aplicar):** validar en el servidor y, además, un `try/catch` que muestre un mensaje útil.
+**✅ Solución aplicada:** validar en el servidor y, además, un `try/catch` que muestre un mensaje útil.
 
 ```php
 if (mb_strlen($nombre) > 100) {
@@ -566,13 +566,13 @@ if (!$fecha || DateTime::getLastErrors()['warning_count']) {
 
 ---
 
-## 21. La base no restringía posiciones ni dorsales
+## 21. ✅ La base no restringía posiciones ni dorsales
 
 **Error:** se puede guardar `posicion = "ADMIN"` y dos jugadores con el mismo dorsal en el mismo equipo.
 
 **Causa:** `jugadores.posicion` es `VARCHAR(50)` y `numero` es `INT UNSIGNED` sin más restricciones. No hay `UNIQUE (equipo_id, numero)` ni lista blanca de posiciones. `equipos.nombre` tampoco es único.
 
-**Solución (pendiente de aplicar):** validar la posición contra la lista del enunciado (Base, Escolta, Alero, Ala-Pívot, Pívot) y añadir la restricción en el esquema:
+**✅ Solución aplicada:** validar la posición contra la lista del enunciado (Base, Escolta, Alero, Ala-Pívot, Pívot) y añadir la restricción en el esquema:
 
 ```sql
 ALTER TABLE jugadores ADD UNIQUE KEY uq_jugador_numero (equipo_id, numero);

@@ -1,6 +1,7 @@
 <h1>Crear Equipo</h1>
 
 <form action="<?= BASE_URL ?>?controller=Equipos&action=guardar" method="POST">
+    <?= csrfCampo() ?>
     <div class="form-group">
         <label for="nombre">Nombre *</label>
         <input type="text" id="nombre" name="nombre" value="<?= isset($old['nombre']) ? htmlspecialchars($old['nombre']) : '' ?>" required>

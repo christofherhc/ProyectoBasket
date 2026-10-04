@@ -32,9 +32,17 @@ La aplicación deberá permitir la gestión integral de una liga de básquetbol 
 | Componente | Especificación |
 | :--- | :--- |
 | **Lenguaje principal** | PHP |
+| **Framework** | Laravel (sugerido, no obligatorio) |
 | **Base de Datos** | MySQL o MariaDB |
 | **Control de versiones** | Git |
 | **Repositorio remoto** | GitHub |
+
+---
+
+> **Nota sobre el framework:** el enunciado *sugiere* Laravel, no lo exige.
+> Este proyecto se resolvió con PHP vanilla a propósito, para que cada pieza
+> (enrutado, sesiones, seguridad) se vea explícita y no dependa de la magia
+> de un framework. La decisión queda justificada en `/doc/practica_liga.md`.
 
 ---
 

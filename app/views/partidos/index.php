@@ -41,7 +41,12 @@
                     <td><?= $res ?></td>
                     <td>
                         <a href="<?= BASE_URL ?>?controller=Partidos&action=editar&id=<?= $p['id'] ?>" class="btn btn-secondary">Editar</a>
-                        <a href="<?= BASE_URL ?>?controller=Partidos&action=eliminar&id=<?= $p['id'] ?>" class="btn btn-danger" onclick="return confirm('¿Eliminar este partido?');">Eliminar</a>
+                                                <form action="<?= BASE_URL ?>?controller=Partidos&action=eliminar" method="POST" class="inline-form"
+                              onsubmit="return confirm('¿Eliminar este partido?');">
+                            <?= csrfCampo() ?>
+                            <input type="hidden" name="id" value="<?= $p['id'] ?>">
+                            <button type="submit" class="btn btn-danger">Eliminar</button>
+                        </form>
                     </td>
                 </tr>
             <?php endforeach; ?>

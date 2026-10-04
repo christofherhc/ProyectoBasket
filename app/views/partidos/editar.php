@@ -1,6 +1,7 @@
 <h1>Editar Partido</h1>
 
 <form action="<?= BASE_URL ?>?controller=Partidos&action=actualizar" method="POST">
+    <?= csrfCampo() ?>
     <input type="hidden" name="id" value="<?= htmlspecialchars((string)$partido['id']) ?>">
 
     <div class="form-group">

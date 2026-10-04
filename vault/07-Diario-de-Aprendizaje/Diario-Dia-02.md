@@ -20,7 +20,7 @@
 
 ## Lo que más me costó
 
-⚠️ **Entender por qué `Database` es Singleton y no simply "una conexión".** No es por rendimiento (cuatro usuarios no lo notan), es porque *todos* los modelos comparten el mismo objeto PDO, y así solo hay un punto donde se configura charset, modo de error y emulación de prepared statements.
+⚠️ **Entender por qué `Database` es Singleton y no simplemente "una conexión".** No es por rendimiento (cuatro usuarios no lo notan), es porque *todos* los modelos comparten el mismo objeto PDO, y así solo hay un punto donde se configura charset, modo de error y emulación de prepared statements.
 
 ⚠️ **El orden de los `require`.** Si `public/index.php` carga `Router` antes que `Controller`, y `Router` intenta instanciar un controlador que extiende `Controller`, PHP da "Class not found". El orden de los requires en un proyecto sin autoloader **es** parte de la arquitectura.
 

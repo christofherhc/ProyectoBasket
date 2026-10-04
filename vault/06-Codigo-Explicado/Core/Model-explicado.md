@@ -129,13 +129,51 @@ public function eliminar(int $id): bool {
 }
 ```
 
-`execute()` devuelve `true` si la sentencia se ejecutó. **Ojo con lo que eso significa:** `true` quiere decir "la orden se envió correctamente", **no** "se borró algo". Si el `id` no existía, `execute()` sigue devolviendo `true` y no se borra ninguna fila. Para saber si había algo que borrar, la forma correcta sería usar `rowCount()`:
+`execute()` devuelve `true` si la sentencia se ejecutó. **Ojo con lo que eso significa:** `true` quiere decir "la orden se envió correctamente", **no** "se borró algo". Si el `id` no existía, `execute()` sigue devolviendo `true` y no se borra ninguna fila. Para saber si había algo que borrar hay que usar `rowCount()`, y el proyecto sí lo hace:
 
 ```php
+// execute() devuelve true aunque no se borre ninguna fila, así que
+// rowCount() es lo que dice si el registro existía de verdad.
+// Aquí no hay la ambigüedad del UPDATE: un DELETE recuenta las filas
+// que borra de verdad, así que 0 significa "no existía".
 return $stmt->execute() && $stmt->rowCount() > 0;
 ```
 
-**El proyecto no usa `rowCount()`**, y funciona porque los controladores no dependen de ello: muestran "eliminado correctamente" y, si no había nada, el efecto es el mismo (no está en el listado).
+#### ⚠️ `rowCount()` no sirve para un UPDATE
+
+Esta es una trampa real, y el proyecto la encontró al escribir los tests de regresión. En un `DELETE`, `rowCount()` cuenta filas eliminadas. En un `UPDATE`, MySQL cuenta filas **cambiadas**, no filas **encontradas**:
+
+| `UPDATE` sobre | Filas encontradas | `rowCount()` |
+|---|---|---|
+| Un id inexistente | 0 | **0** |
+| Un id existente al que se le cambia algo | 1 | **1** |
+| Un id existente al que se le guarda lo mismo | 1 | **0** ⚠️ |
+
+Las dos últimas filas son el problema. Si el usuario abre el formulario de edición, no cambia nada y pulsa guardar, MySQL devuelve `0` y el código conclude "ese equipo no existe":
+
+```
+Actualización fallida: No se encontró el equipo que se quiso modificar
+```
+
+...para un equipo que existe perfectamente y que el usuario acaba de ver en pantalla.
+
+⚠️ **Un falso negativo es peor que un falso positivo aquí.** Un falso positivo (decir "guardado" sin haber guardado) es una molestia. Un falso negativo (decir "no existe" sobre algo que el usuario tiene delante) hace pensar que la aplicación está rota.
+
+La solución en `Equipo`, `Jugador` y `Partido` es no fiarse de `rowCount()` para decidir si el id existe:
+
+```php
+if (!$stmt->execute()) {
+    return false;
+}
+if ($stmt->rowCount() > 0) {
+    return true;                     // se cambió algo: todo bien
+}
+return $this->obtenerPorId($id) !== null;   // 0 filas: ¿existe o no?
+```
+
+⚠️ **La consulta de descarte es un `SELECT` extra por guardado.** Solo se ejecuta en el caso raro de "no se cambió nada", así que en el uso normal no se nota. La alternativa sería `PDO::MYSQL_ATTR_FOUND_ROWS`, que hace que `rowCount()` cuente filas encontradas, pero es un ajuste de conexión que cambia el significado de `rowCount()` en toda la aplicación; para este proyecto el `SELECT` explícito es más fácil de entender.
+
+⚠️ **Los controladores también validan antes de llamar.** `validarId()` ya comprueba la existencia con `obtenerPorId()`, así que el mensaje correcto ya se ha mostrado antes. La comprobación del modelo es la red de seguridad para un `actualizar()` que se llame desde otro sitio.
 
 ### `obtenerUltimoId()`
 

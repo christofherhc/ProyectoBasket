@@ -8,8 +8,8 @@ class JugadoresController extends Controller {
     private Equipo $equipoModel;
 
     public function __construct() {
-        require_once '../app/models/Jugador.php';
-        require_once '../app/models/Equipo.php';
+        require_once __DIR__ . '/../models/Jugador.php';
+        require_once __DIR__ . '/../models/Equipo.php';
         $this->jugadorModel = new Jugador();
         $this->equipoModel = new Equipo();
     }
@@ -37,44 +37,25 @@ class JugadoresController extends Controller {
 
     public function guardar(): void {
         $this->requiereLogin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . '?controller=Jugadores&action=crear');
-            exit;
+        exigirPost('controller=Jugadores&action=crear');
+
+        [$datos, $errores] = $this->validarCampos();
+
+        if ($errores !== []) {
+            flashError(implode(' ', $errores));
+            redir('controller=Jugadores&action=crear');
         }
 
-        $nombre = trim($_POST['nombre'] ?? '');
-        $numero = $_POST['numero'] ?? '';
-        $posicion = trim($_POST['posicion'] ?? '');
-        $equipoId = (int)($_POST['equipo_id'] ?? 0);
+        $this->jugadorModel->crear(
+            $datos['nombre'],
+            $datos['numero'],
+            $datos['posicion'],
+            $datos['equipo_id']
+        );
 
-        $_SESSION['old_jugador'] = [
-            'nombre' => $nombre,
-            'numero' => $numero,
-            'posicion' => $posicion,
-            'equipo_id' => $equipoId
-        ];
-
-        if (empty($nombre) || $equipoId <= 0) {
-            $_SESSION['error'] = 'Nombre y equipo son obligatorios';
-            header('Location: ' . BASE_URL . '?controller=Jugadores&action=crear');
-            exit;
-        }
-
-        $numeroInt = null;
-        if ($numero !== '') {
-            $numeroInt = (int)$numero;
-            if ($numeroInt < 0 || $numeroInt > 99) {
-                $_SESSION['error'] = 'Número de camiseta inválido (0-99)';
-                header('Location: ' . BASE_URL . '?controller=Jugadores&action=crear');
-                exit;
-            }
-        }
-
-        $this->jugadorModel->crear($nombre, $numeroInt, $posicion, $equipoId);
         unset($_SESSION['old_jugador']);
-        $_SESSION['exito'] = 'Jugador creado correctamente';
-        header('Location: ' . BASE_URL . '?controller=Jugadores&action=index');
-        exit;
+        flashExito('Jugador creado correctamente');
+        redir('controller=Jugadores&action=index');
     }
 
     public function editar(array $params): void {
@@ -82,9 +63,8 @@ class JugadoresController extends Controller {
         $id = (int)($params['id'] ?? 0);
         $jugador = $this->jugadorModel->obtenerPorId($id);
         if ($jugador === null) {
-            $_SESSION['error'] = 'Jugador no encontrado';
-            header('Location: ' . BASE_URL . '?controller=Jugadores&action=index');
-            exit;
+            flashError('Jugador no encontrado');
+            redir('controller=Jugadores&action=index');
         }
         $equipos = $this->equipoModel->obtenerTodos();
         $old = $_SESSION['old_jugador'] ?? [];
@@ -99,57 +79,138 @@ class JugadoresController extends Controller {
 
     public function actualizar(): void {
         $this->requiereLogin();
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: ' . BASE_URL . '?controller=Jugadores&action=index');
-            exit;
+        exigirPost('controller=Jugadores&action=index');
+
+        $id = (int)post('id');
+        [$datos, $errores] = $this->validarCampos();
+
+        if ($errores === []) {
+            $errores = $this->validarId($id);
         }
 
-        $id = (int)($_POST['id'] ?? 0);
-        $nombre = trim($_POST['nombre'] ?? '');
-        $numero = $_POST['numero'] ?? '';
-        $posicion = trim($_POST['posicion'] ?? '');
-        $equipoId = (int)($_POST['equipo_id'] ?? 0);
+        // Devuelve al formulario de edición, no al listado, para no perder
+        // los datos que el usuario ya había escrito.
+        $volver = 'controller=Jugadores&action=editar&id=' . $id;
 
-        $_SESSION['old_jugador'] = [
-            'nombre' => $nombre,
-            'numero' => $numero,
-            'posicion' => $posicion,
-            'equipo_id' => $equipoId
-        ];
-
-        if (empty($nombre) || $equipoId <= 0 || $id <= 0) {
-            $_SESSION['error'] = 'Datos inválidos para actualizar jugador';
-            header('Location: ' . BASE_URL . '?controller=Jugadores&action=index');
-            exit;
+        if ($errores !== []) {
+            flashError(implode(' ', $errores));
+            redir($volver);
         }
 
-        $numeroInt = null;
-        if ($numero !== '') {
-            $numeroInt = (int)$numero;
-            if ($numeroInt < 0 || $numeroInt > 99) {
-                $_SESSION['error'] = 'Número de camiseta inválido (0-99)';
-                header('Location: ' . BASE_URL . '?controller=Jugadores&action=editar&id=' . $id);
-                exit;
-            }
-        }
+        $actualizado = $this->jugadorModel->actualizar(
+            $id,
+            $datos['nombre'],
+            $datos['numero'],
+            $datos['posicion'],
+            $datos['equipo_id']
+        );
 
-        $this->jugadorModel->actualizar($id, $nombre, $numeroInt, $posicion, $equipoId);
         unset($_SESSION['old_jugador']);
-        $_SESSION['exito'] = 'Jugador actualizado correctamente';
-        header('Location: ' . BASE_URL . '?controller=Jugadores&action=index');
-        exit;
+
+        if (!$actualizado) {
+            flashError('No se encontró el jugador que se quiso modificar');
+            redir('controller=Jugadores&action=index');
+        }
+
+        flashExito('Jugador actualizado correctamente');
+        redir('controller=Jugadores&action=index');
     }
 
     public function eliminar(array $params): void {
         $this->requiereLogin();
-        $id = (int)($params['id'] ?? 0);
-        if ($id > 0) {
-            $this->jugadorModel->eliminar($id);
-            $_SESSION['exito'] = 'Jugador eliminado correctamente';
-        } else {
-            $_SESSION['error'] = 'ID de jugador inválido';
+        exigirPost('controller=Jugadores&action=index');
+
+        $id = (int)post('id');
+
+        if ($id <= 0) {
+            flashError('ID de jugador inválido');
+            redir('controller=Jugadores&action=index');
         }
-        header('Location: ' . BASE_URL . '?controller=Jugadores&action=index');
-        exit;
+
+        if (!$this->jugadorModel->eliminar($id)) {
+            flashError('No se encontró el jugador que se quiso eliminar');
+            redir('controller=Jugadores&action=index');
+        }
+
+        flashExito('Jugador eliminado correctamente');
+        redir('controller=Jugadores&action=index');
+    }
+
+    /**
+     * Valida los campos del formulario de jugador.
+     *
+     * @return array [datos, errores]
+     */
+    private function validarCampos(): array {
+        $nombre    = trim(post('nombre'));
+        $numero    = trim(post('numero'));
+        $posicion  = trim(post('posicion'));
+        $equipoId  = (int)post('equipo_id', '0');
+
+        $_SESSION['old_jugador'] = [
+            'nombre'    => $nombre,
+            'numero'    => $numero,
+            'posicion'  => $posicion,
+            'equipo_id' => $equipoId,
+        ];
+
+        $errores = [];
+
+        if ($nombre === '') {
+            $errores[] = 'El nombre es obligatorio';
+        } elseif (!cabeEnColumna($nombre, MAX_NOMBRE)) {
+            $errores[] = 'El nombre no puede superar los ' . MAX_NOMBRE . ' caracteres';
+        }
+
+        // Dorsal
+        $numeroInt = null;
+        if ($numero !== '') {
+            if (!ctype_digit($numero)) {
+                $errores[] = 'El número de camiseta debe ser un número entero';
+            } else {
+                $numeroInt = (int)$numero;
+                if ($numeroInt < 1 || $numeroInt > MAX_CAMISETA) {
+                    $errores[] = 'El número de camiseta debe estar entre 1 y ' . MAX_CAMISETA;
+                }
+            }
+        }
+
+        // Posición: lista blanca, porque la columna es VARCHAR y no ENUM.
+        if ($posicion !== '' && !in_array($posicion, POSICIONES, true)) {
+            $errores[] = 'Posición no válida. Opciones: ' . implode(', ', POSICIONES);
+        }
+
+        // Equipo: debe existir de verdad, o la clave foránea revienta con 1452.
+        if ($equipoId <= 0) {
+            $errores[] = 'Debe seleccionar un equipo';
+        } elseif ($this->equipoModel->obtenerPorId($equipoId) === null) {
+            $errores[] = 'El equipo seleccionado no existe';
+        }
+
+        return [
+            [
+                'nombre'    => $nombre,
+                'numero'    => $numeroInt,
+                'posicion'  => $posicion === '' ? null : $posicion,
+                'equipo_id' => $equipoId,
+            ],
+            $errores,
+        ];
+    }
+
+    /**
+     * Comprueba que el id sea válido y que el jugador exista.
+     *
+     * @param int $id
+     * @return array Lista de errores
+     */
+    private function validarId(int $id): array {
+        if ($id <= 0) {
+            return ['ID de jugador inválido'];
+        }
+        if ($this->jugadorModel->obtenerPorId($id) === null) {
+            return ['No se encontró el jugador que se quiso modificar'];
+        }
+        return [];
     }
 }

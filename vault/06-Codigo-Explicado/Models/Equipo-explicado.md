@@ -254,7 +254,7 @@ SELECT COUNT(*) AS con_cero FROM equipos WHERE fundacion = 0;"
 | `htmlspecialchars($valor)` sin comprobar `null` | `TypeError` en PHP 8.1+ | `$valor ?? '—'` o `!== null` |
 | `WHERE fundacion = null` en SQL | Nunca encuentra nada | `WHERE fundacion IS NULL` |
 | No comprobar la existencia antes de `DELETE` | **Error 1451 sin capturar = HTTP 500 con pantalla en blanco** | Comprobar dependientes primero |
-| `eliminar()` sin `rowCount()` | Muestra "eliminado correctamente" aunque no borrara nada | Usar `execute() && rowCount() > 0` |
+| `eliminar()` sin `rowCount()` | Muestra "eliminado correctamente" aunque no borrara nada | **Resuelto:** `execute() && rowCount() > 0` |
 
 ---
 
