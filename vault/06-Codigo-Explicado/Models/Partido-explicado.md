@@ -73,7 +73,7 @@ Como `equipos` aparece **dos veces**, cada aparición necesita un nombre propio:
 | `el` | `equipos` **como** equipo local (**e**quipo **l**ocal) |
 | `ev` | `equipos` **como** equipo visitante (**e**quipo **v**isitante) |
 
-Los alias son으로는 mnemotécnicos a propósito: `el` de "equipo local", `ev` de "equipo visitante".
+Los alias son mnemotécnicos a propósito: `el` de "equipo local", `ev` de "equipo visitante".
 
 **Sin alias, esto no compila:**
 ```sql

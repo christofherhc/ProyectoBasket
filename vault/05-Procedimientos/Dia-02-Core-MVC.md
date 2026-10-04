@@ -154,7 +154,11 @@ class Controller {
 
 ⚠️ **`extract($datos)` convierte el array en variables.** Si pasas `['titulo' => 'Equipos']`, dentro de la vista existe `$titulo`. Es cómodo para aprender, pero tiene un riesgo: si el array contiene una clave llamada `ruta` o `datos`, **pisa** la variable local. Por eso el proyecto pasa siempre arrays associative con nombres propios.
 
-⚠️ **`__DIR__` en vez de una ruta escrita a mano.** `__DIR__` es la carpeta del archivo actual, así que `__DIR__ . '/../views/'` funciona sin importar desde dónde se llame al método. Las rutas relativas dependen del archivo que las ejecuta, y eso se rompe en cuanto un `require` se mueve de sitio.
+⚠️ **Aquí NO se usa `__DIR__`, y es una fragilidad real.** El `require` es `require_once '../app/views/layouts/main.php'`: una ruta **relativa**. PHP la resuelve contra el **directorio de trabajo** del proceso, no contra el archivo que la ejecuta, así que funciona únicamente porque Apache sirve el proyecto con el directorio de trabajo en `public/`.
+
+Lo correcto sería `require_once __DIR__ . '/../views/layouts/main.php'`, que funciona desde cualquier carpeta. Es exactamente lo mismo que hace `public/index.php`, que **sí** usa `__DIR__` en sus cinco `require`. El proyecto es inconsistente: el punto de entrada es robusto y todo lo demás depende del directorio de trabajo.
+
+⚠️ **Cómo comprobarlo:** `getcwd()` devuelve el directorio de trabajo. Con Apache en XAMPP es `public/`. Si algún día se ejecuta la app desde otro sitio (`php -S localhost:8000 -t public` lanzado desde la raíz, o un script CLI), estos `require` fallan con "Failed to open stream".
 
 ⚠️ **La protección va en el controlador, no en el Router.** `Router` no sabe qué acciones son públicas (login, registro) y cuáles privadas. Si la metiera en el Router, tendría que mantener una lista de excepciones, y cada acción nueva que se olvide de añadir a esa lista quedaría desprotegida.
 
@@ -259,7 +263,9 @@ new Router();
 
 ⚠️ **Los `require_once` son explícitos, no hay autoloader.** Es una decisión consciente para un proyecto de 22 archivos PHP: la lista se lee de un vistazo y no hay misterio. En un proyecto con cientos de clases se usaría `spl_autoload_register()`; aquí solo añadiría líneas.
 
-⚠️ **`__DIR__` en los `require`.** `__DIR__` es la ruta absoluta del archivo que lo contiene, así que el `require` funciona **desde cualquier carpeta**. Con una ruta relativa (`require 'app/core/Router.php'`) el día que la app se ejecute desde otro directorio, todos los includes fallan.
+⚠️ **`__DIR__` en los `require` de `public/index.php`.** `__DIR__` es la ruta absoluta del archivo que lo contiene, así que el `require` funciona **desde cualquier carpeta**. Con una ruta relativa (`require 'app/core/Router.php'`) el día que la app se ejecute desde otro directorio, todos los includes fallan.
+
+⚠️ **Ojo: esto solo se cumple en `index.php`.** Los `require` de `Controller::view()`, de `Router::loadController()` y de los cinco controladores usan rutas **relativas** (`'../app/models/...'`). El punto de entrada es robusto; el resto de la app no. Ver la nota del Paso 2.4.
 
 ⚠️ **Los modelos NO se cargan aquí.** Cada controlador carga los suyos en su constructor:
 ```php

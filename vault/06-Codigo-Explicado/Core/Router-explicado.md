@@ -158,7 +158,7 @@ public function editar(array $params): void {
 
 Y por eso `index()` no acepta parámetros: el `Router` siempre pasa el array, y un método que no lo declara... simplemente lo ignora (PHP no da error por argumentos sobrantes).
 
-**⚠️ Ese comportamiento es una trampa.** Si declaras `index()` sin parámetro y luego escribes `$params['id']` dentro,elease un aviso de variable no definida. Si declaras `editar()` **sin** `array $params` y haces `$params['id']`, PHP da error fatal. **Regla:** todo método público de un controlador recibe `array $params`, y accedes siempre con `$params['x'] ?? valorPorDefecto`.
+**⚠️ Ese comportamiento es una trampa.** Si declaras `index()` sin parámetro y luego escribes `$params['id']` dentro, suelta un aviso de variable no definida. Si declaras `editar()` **sin** `array $params` y haces `$params['id']`, PHP da error fatal. **Regla:** todo método público de un controlador recibe `array $params`, y accedes siempre con `$params['x'] ?? valorPorDefecto`.
 
 ## 4. Un ejemplo completo, de la URL al resultado
 

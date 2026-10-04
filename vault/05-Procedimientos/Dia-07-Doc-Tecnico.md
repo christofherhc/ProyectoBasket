@@ -33,7 +33,7 @@ Documento con las secciones exigidas por la práctica:
 | Conclusiones | Lo aprendido |
 | Bibliografía | Manuales de PHP y MySQL/MariaDB |
 
-⚠️ **Un detalle de formato:** el enunciado pedía 500-600 palabras en la parte descriptiva. Escribirlo a la primeradio cuesta más que ajustarlo después, porque contar palabras de forma aproximada obliga a recortar o expandir frases a ciegas. La versión final quedó ajustada a la extensión pedida.
+⚠️ **Un detalle de formato:** el enunciado pedía 500-600 palabras en la parte descriptiva. Escribirlo a la primera vez cuesta más que ajustarlo después, porque contar palabras de forma aproximada obliga a recortar o expandir frases a ciegas. La versión final quedó ajustada a la extensión pedida.
 
 ### Paso 7.2: Escribir el documento como ejemplo
 

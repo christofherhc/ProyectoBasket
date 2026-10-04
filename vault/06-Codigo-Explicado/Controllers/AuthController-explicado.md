@@ -170,7 +170,7 @@ Esto parece estar fuera de lugar (está antes de los `if`), pero es una decisió
 
 ⚠️ **Nunca se guardan las contraseñas en la sesión.** Solo `nombre` y `email`. Si guardaras la contraseña "para convenience", acabarías con contraseñas en texto plano en el disco del servidor.
 
-### Las cinco reglas, en orden deExit
+### Las cinco reglas, en orden de salida
 
 | # | Comprobación | Código | Mensaje |
 |---|---|---|---|

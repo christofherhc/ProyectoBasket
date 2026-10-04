@@ -248,13 +248,13 @@ SELECT COUNT(*) AS con_cero FROM equipos WHERE fundacion = 0;"
 
 | Error | Síntoma | Solución |
 |---|---|---|
-| Sin `PDO::PARAM_NULL` | El año vacío se guarda como `0` | Declarar el tipo en `bindValue()` |
-| `bindValue(':fundacion', null)` sin el tercer parámetro | El `NULL` llega como `''` o `0` | Añadir `PDO::PARAM_NULL` |
-| Usar `execute([':fundacion' => null])` | Comportamiento incierto según la versión | `bindValue()` con tipo explícito |
-| `(int)` en el controlador sobre `""` | Se pierde la diferencia vacío/0 | Comprobar `!== ''` antes de convertir |
+| El `""` se convierte con `(int)` **antes** de llegar a PDO | El año vacío se guarda como `0`, indistinguible de un año real | Comprobar `!== ''` en el controlador |
+| `bindValue(':f', null)` sin el tercer parámetro | Depende: con prepares nativos llega como `NULL` | Añadir `PDO::PARAM_NULL` para ser explícito |
+| `execute([':f' => null])` | **Verificado en PHP 8.2 + MariaDB 10.4: sí guarda `NULL`** | Funciona, pero `bindValue()` con tipo es más legible |
 | `htmlspecialchars($valor)` sin comprobar `null` | `TypeError` en PHP 8.1+ | `$valor ?? '—'` o `!== null` |
 | `WHERE fundacion = null` en SQL | Nunca encuentra nada | `WHERE fundacion IS NULL` |
-| No comprobar la existencia antes de `DELETE` | Error 1451 sin capturar | Comprobar dependientes primero |
+| No comprobar la existencia antes de `DELETE` | **Error 1451 sin capturar = HTTP 500 con pantalla en blanco** | Comprobar dependientes primero |
+| `eliminar()` sin `rowCount()` | Muestra "eliminado correctamente" aunque no borrara nada | Usar `execute() && rowCount() > 0` |
 
 ---
 

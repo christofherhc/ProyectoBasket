@@ -23,7 +23,7 @@ Por primera vez se vio el ciclo entero de un módulo: **Modelo → Controlador �
 
 ## Lo que más me costó
 
-⚠️ **`actualizar()` no comprobaba que el registro existiera.** Si el id no existe, el `UPDATE`affected 0 filas y la appRespondía "equipo actualizado" igualmente. Ahora está anotado como limitación pendiente (gravidad baja).
+⚠️ **`actualizar()` no comprobaba que el registro existiera.** Si el id no existe, el `UPDATE` afecta a 0 filas y la app respondía "equipo actualizado" igualmente. Ahora está anotado como limitación pendiente (gravidad baja).
 
 ⚠️ **La diferencia entre "campo vacío" y "valor 0".** `$_POST['fundacion']` vacío llega como `''`, y `'' == 0` es `true` en PHP. Con `if (!$fundacion)` seuba a 0 una fundación vacía. La solución fue `=== ''` para comprobar vacío y `intval()` para el resto.
 

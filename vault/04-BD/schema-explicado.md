@@ -90,7 +90,11 @@ CREATE TABLE IF NOT EXISTS jugadores (
 | `CASCADE` | Borra también sus jugadores automáticamente. **Peligroso**: pierdes datos sin avisar. |
 | `RESTRICT` | **No te deja borrar** el equipo si tiene jugadores. **Elegido aquí.** |
 
-Elegimos `RESTRICT` a propósito: es más seguro que la aplicación decida qué hacer. Si un usuario intenta borrar un equipo con jugadores, el `DELETE` falla y el controlador muestra un mensaje de error en vez de destruir datos.
+Elegimos `RESTRICT` a propósito: es más seguro que la aplicación decida qué hacer. Si un usuario intenta borrar un equipo con jugadores, el `DELETE` falla y **no se destruye nada**.
+
+⚠️ **Pero "falla" aquí significa HTTP 500, no un mensaje amable.** `Database` configura `PDO::ERRMODE_EXCEPTION`, así que el error 1451 se lanza como `PDOException` y **ningún controlador la captura**: el usuario ve una pantalla en blanco. Es la limitación más visible del proyecto, y la reasona estar documentada en `06-Codigo-Explicado/Controllers/EquiposController-explicado.md` sección 8, con las dos formas de arreglarla.
+
+⚠️ **Los datos sí están a salvo** (de eso se trata `RESTRICT`), pero la experiencia de usuario es un error 500 en vez de "No se puede eliminar: el equipo tiene jugadores registrados".
 
 `ON UPDATE CASCADE` significa que si someday cambiaras el `id` de un equipo, las referencias se actualizan solas.
 

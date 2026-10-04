@@ -49,7 +49,7 @@ class EquiposController extends Controller {
 - `PartidosController` carga `Partido` **y** `Equipo`.
 - `EstadisticasController` carga solo `Partido`.
 
-**Nota sobre `extends Controller` sinLlaves:** PHP 8 permite `extends Controller { ... }` sin la palabra `class` repetida. La forma clásica es:
+**Nota sobre `extends Controller` sin llaves:** PHP 8 permite `extends Controller { ... }` sin la palabra `class` repetida. La forma clásica es:
 
 ```php
 class EquiposController extends Controller {
@@ -306,7 +306,7 @@ DELETE FROM equipos WHERE id = 1;   -- si tiene 3 jugadores
 
 El modelo llama a `execute()` con `ERRMODE_EXCEPTION`, así que la excepción **sube** y el usuario ve una pantalla de error de PHP en vez de un mensaje amable.
 
-**Este es el error más probable que시험 te encuentres al probar el proyecto:** intenta borrar un equipo que tenga jugadores (los 4 equipos de `seeds.sql` los tienen) y verás el error.
+**Este es el error más probable que te encuentres al probar el proyecto:** intenta borrar un equipo que tenga jugadores (los 4 equipos de `seeds.sql` los tienen) y verás el error.
 
 Las dos formas de arreglarlo:
 
