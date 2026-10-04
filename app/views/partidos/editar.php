@@ -37,7 +37,7 @@
 
     <div class="form-group">
         <label for="fecha">Fecha y Hora *</label>
-        <input type="datetime-local" id="fecha" name="fecha" value="<?= htmlspecialchars(substr($old['fecha'] ?? $partido['fecha'], 0, 16)) ?>" required>
+        <input type="datetime-local" id="fecha" name="fecha" value="<?= htmlspecialchars(str_replace(' ', 'T', substr($old['fecha'] ?? $partido['fecha'], 0, 16))) ?>" required>
     </div>
 
     <button type="submit" class="btn">Actualizar</button>
