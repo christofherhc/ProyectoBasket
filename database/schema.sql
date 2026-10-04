@@ -1,6 +1,17 @@
+-- =============================================
 -- Esquema de Base de Datos: Liga de Básquetbol
 -- Motor: InnoDB | Charset: utf8mb4
--- Fecha: 2026-10-03
+-- Compatible con MySQL y MariaDB (XAMPP)
+-- =============================================
+-- Este script crea la base de datos si no existe
+-- y luego todas las tablas. Es seguro reimportarlo.
+-- =============================================
+
+CREATE DATABASE IF NOT EXISTS liga_basquet
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE liga_basquet;
 
 -- =============================================
 -- 1. TABLA USUARIOS (AUTENTICACIÓN)
@@ -34,6 +45,7 @@ CREATE TABLE IF NOT EXISTS jugadores (
   posicion VARCHAR(50) NULL COMMENT 'Posición: Base/Escolta/Alero/Ala-Pívot/Pívot',
   equipo_id INT UNSIGNED NOT NULL COMMENT 'Equipo al que pertenece (FK)',
   creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_jugador_equipo (equipo_id),
   CONSTRAINT fk_jugador_equipo FOREIGN KEY (equipo_id) REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -48,14 +60,9 @@ CREATE TABLE IF NOT EXISTS partidos (
   puntos_local INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Puntos equipo local',
   puntos_visitante INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Puntos equipo visitante',
   creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_partido_local (equipo_local_id),
+  KEY idx_partido_visitante (equipo_visitante_id),
+  KEY idx_partido_fecha (fecha),
   CONSTRAINT fk_partido_local FOREIGN KEY (equipo_local_id) REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT fk_partido_visitante FOREIGN KEY (equipo_visitante_id) REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =============================================
--- ÍNDICES RECOMENDADOS PARA CONSULTAS
--- =============================================
-CREATE INDEX idx_jugador_equipo ON jugadores(equipo_id);
-CREATE INDEX idx_partido_local ON partidos(equipo_local_id);
-CREATE INDEX idx_partido_visitante ON partidos(equipo_visitante_id);
-CREATE INDEX idx_partido_fecha ON partidos(fecha);
