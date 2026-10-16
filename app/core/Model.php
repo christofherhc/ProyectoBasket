@@ -58,7 +58,7 @@ class Model {
         // execute() devuelve true aunque no se borre ninguna fila, así que
         // rowCount() es lo que dice si el registro existía de verdad.
         // Aquí no hay la ambigüedad del UPDATE: un DELETE recuenta las filas
-        // que Borra de verdad, así que 0 significa "no existía".
+        // que borra de verdad, así que 0 significa "no existía".
         return $stmt->execute() && $stmt->rowCount() > 0;
     }
 

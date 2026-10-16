@@ -163,8 +163,8 @@ class EquiposController extends Controller {
                 $errores[] = 'El año de fundación debe ser un número entero';
             } else {
                 $fundacionInt = (int)$fundacion;
-                if ($fundacionInt < 1800 || $fundacionInt > (int)date('Y')) {
-                    $errores[] = 'El año de fundación debe estar entre 1800 y ' . date('Y');
+                if ($fundacionInt < FUNDACION_MIN || $fundacionInt > (int)date('Y')) {
+                    $errores[] = 'El año de fundación debe estar entre ' . FUNDACION_MIN . ' y ' . date('Y');
                 }
             }
         }

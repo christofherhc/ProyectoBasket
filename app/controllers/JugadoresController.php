@@ -82,7 +82,7 @@ class JugadoresController extends Controller {
         exigirPost('controller=Jugadores&action=index');
 
         $id = (int)post('id');
-        [$datos, $errores] = $this->validarCampos();
+        [$datos, $errores] = $this->validarCampos($id);
 
         if ($errores === []) {
             $errores = $this->validarId($id);
@@ -139,9 +139,11 @@ class JugadoresController extends Controller {
     /**
      * Valida los campos del formulario de jugador.
      *
+     * @param int|null $ignorarId Al editar, el id del propio jugador (para no
+     *                            marcarlo como dorsal duplicado de sí mismo).
      * @return array [datos, errores]
      */
-    private function validarCampos(): array {
+    private function validarCampos(?int $ignorarId = null): array {
         $nombre    = trim(post('nombre'));
         $numero    = trim(post('numero'));
         $posicion  = trim(post('posicion'));
@@ -162,15 +164,15 @@ class JugadoresController extends Controller {
             $errores[] = 'El nombre no puede superar los ' . MAX_NOMBRE . ' caracteres';
         }
 
-        // Dorsal
+        // Dorsal: opcional. El 0 es válido (hay jugadores que lo llevan).
         $numeroInt = null;
         if ($numero !== '') {
             if (!ctype_digit($numero)) {
                 $errores[] = 'El número de camiseta debe ser un número entero';
             } else {
                 $numeroInt = (int)$numero;
-                if ($numeroInt < 1 || $numeroInt > MAX_CAMISETA) {
-                    $errores[] = 'El número de camiseta debe estar entre 1 y ' . MAX_CAMISETA;
+                if ($numeroInt > MAX_CAMISETA) {
+                    $errores[] = 'El número de camiseta debe estar entre 0 y ' . MAX_CAMISETA;
                 }
             }
         }
@@ -181,10 +183,20 @@ class JugadoresController extends Controller {
         }
 
         // Equipo: debe existir de verdad, o la clave foránea revienta con 1452.
+        $equipoExiste = false;
         if ($equipoId <= 0) {
             $errores[] = 'Debe seleccionar un equipo';
         } elseif ($this->equipoModel->obtenerPorId($equipoId) === null) {
             $errores[] = 'El equipo seleccionado no existe';
+        } else {
+            $equipoExiste = true;
+        }
+
+        // Dorsal repetido dentro del mismo equipo. El índice UNIQUE lo bloquea
+        // igualmente, pero así el mensaje es claro y apunta al campo.
+        if ($numeroInt !== null && $equipoExiste
+            && $this->jugadorModel->existeDorsalEnEquipo($equipoId, $numeroInt, $ignorarId ?? 0)) {
+            $errores[] = 'Ese número de camiseta ya está en uso en el equipo seleccionado';
         }
 
         return [

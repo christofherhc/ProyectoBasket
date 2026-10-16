@@ -9,7 +9,7 @@
  */
 
 /**
- * Lee un valor de $_POST garantindo que sea texto.
+ * Lee un valor de $_POST garantizando que sea texto.
  *
  * Sin esta comprobación, un formulario manipulado que envíe "nombre[]=x"
  * haría que trim() recibiera un array y PHP 8 lanzaría un TypeError

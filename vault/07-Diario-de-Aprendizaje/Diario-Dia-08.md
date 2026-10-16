@@ -66,10 +66,10 @@ value="<?= htmlspecialchars(str_replace(' ', 'T', substr($partido['fecha'], 0, 1
 | Módulos | 5 |
 | Archivos PHP | 22 |
 | Tablas | 4, con 3 claves foráneas |
-| Pruebas | **81 / 81** |
+| Pruebas | **81 / 81** (tras la auditoría, la suite subió a **87 / 87**) |
 | Git | Historial limpio, commits atómicos |
 
-**Pendiente fuera del alcance:** conectar con un remoto de GitHub, demostrar ramas y Pull Requests, y generar el ZIP de entrega con `.git` incluida.
+**Pendiente fuera del alcance:** conectar con un remoto de GitHub, demostrar ramas y Pull Requests. *(El ZIP de entrega con `.git` incluida se generó después.)*
 
 ---
 

@@ -66,17 +66,18 @@ Usaremos ejemplo real: `?controller=Equipos&action=index`
 - `new Router()` → Lanza enrutamiento
 
 ### PASO 3: Router (`app/core/Router.php`)
-- `parseUrl()`: Lee `$_GET`
-  - controller = "Equipos" → `ucfirst(strtolower) = "Equipos"`
-  - action = "index" → `"index"`
-  - params = `[]` (sin id)
+- `parseUrl()`: Lee `$_GET` con el helper `get()`
+  - controller = "equipos" → se contrasta contra la lista blanca `RUTAS`
+  - action = "index" → se comprueba que exista para ese controlador
+  - params = `[]` (solo escalares; sin `controller` ni `action`)
 - `loadController()`:
   - nombreClase = `EquiposController`
-  - ruta = `../../app/controllers/EquiposController.php`
+  - ruta = `__DIR__ . '/../controllers/EquiposController.php'`
   - `require_once` + `new EquiposController()`
 - `executeAction()`:
-  - Verifica `method_exists(EquiposController, 'index')`
+  - Verifica `is_callable([$obj, 'index'])` (no `method_exists`, que aceptaba métodos `protected`)
   - Llama `call_user_func_array([$obj, 'index'], [[]])`
+  - Si algo falla → `error()` responde 404 con página propia, sin imprimir datos de la URL
 
 ### PASO 4: Controlador (`app/controllers/EquiposController.php`)
 

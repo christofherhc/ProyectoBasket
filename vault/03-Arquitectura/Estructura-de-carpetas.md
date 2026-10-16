@@ -58,10 +58,8 @@ ProyectoBasket/
 │
 ├── public/                     # Carpeta pública (DocumentRoot)
 │   ├── index.php               # ÚNICO punto de entrada (Front Controller)
-│   ├── css/
-│   │   └── styles.css          # Estilos CSS puros (legibles)
-│   └── js/
-│       └── app.js              # JavaScript mínimo (opcional)
+│   └── css/
+│       └── styles.css          # Estilos CSS puros (legibles)
 │
 ├── database/                   # SQL de base de datos
 │   ├── schema.sql              # Estructura: tablas, PK, FK, constraints
@@ -186,7 +184,6 @@ Patrón consistente → fácil aprender.
 
 - `index.php` → Front Controller. Carga todo core + router. Inicia sesión.
 - `css/styles.css` → Estilos propios, legibles, comentados mínimos.
-- `js/app.js` → JS mínimo (validación cliente opcional). No imprescindible.
 
 **Acceso:** `http://localhost/ProyectoBasket/public/`
 
@@ -254,7 +251,7 @@ respuesta navegador
 
 - **Clases:** PascalCase (`Equipo.php`, `EquiposController.php`)
 - **Vistas:** minúsculas (`index.php`, `crear.php`)
-- **CSS/JS:** minúsculas (`styles.css`, `app.js`)
+- **CSS/JS:** minúsculas (`styles.css`)
 - **SQL:** minúsculas (`schema.sql`)
 - **Carpetas:** minúsculas/plurales coherentes
 

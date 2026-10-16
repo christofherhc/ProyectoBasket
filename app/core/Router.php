@@ -120,7 +120,7 @@ class Router {
         }
 
         // is_callable() descarta métodos protegidos y privados.
-        // method_exists() los aceptaba y provoke pantallas en blanco.
+        // method_exists() los aceptaba y provocaba pantallas en blanco.
         if (!is_callable([$this->controllerObjeto, $this->actionNombre])) {
             $this->error('La acción solicitada no está disponible.');
         }

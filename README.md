@@ -29,8 +29,7 @@ ProyectoBasket/
 │   └── views/                   # Vistas con layout base
 ├── public/
 │   ├── index.php                # Front controller (punto de entrada)
-│   ├── css/styles.css           # Estilos propios
-│   └── js/app.js                # JS mínimo
+│   └── css/styles.css           # Estilos propios
 ├── database/
 │   ├── schema.sql               # Esquema de base de datos
 │   └── seeds.sql                # Datos de prueba opcionales

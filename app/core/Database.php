@@ -43,8 +43,20 @@ class Database {
                 self::$instancia = new PDO($dsn, DB_USER, DB_PASS, $opciones);
                 
             } catch (PDOException $e) {
-                // En caso de error de conexión
-                die('Error de conexión a la base de datos: ' . $e->getMessage());
+                // No se muestra el mensaje de PDO: incluye el DSN (host, nombre
+                // de la base) y detalles internos que no debe ver un visitante.
+                // Se registra para el administrador y se responde genérico.
+                error_log('[ProyectoBasket] Error de conexión a la base de datos: ' . $e->getMessage());
+                if (!headers_sent()) {
+                    http_response_code(500);
+                    header('Content-Type: text/html; charset=utf-8');
+                }
+                echo '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+                    . '<title>Servicio no disponible</title></head><body>'
+                    . '<h1>Servicio no disponible</h1>'
+                    . '<p>No se pudo conectar con la base de datos. Inténtalo más tarde.</p>'
+                    . '</body></html>';
+                exit;
             }
         }
         

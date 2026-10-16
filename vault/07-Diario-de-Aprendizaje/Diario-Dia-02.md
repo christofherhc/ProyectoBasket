@@ -36,7 +36,7 @@
 
 ## Decisiones tomadas
 - `BASE_URL` calculado con `$_SERVER['SCRIPT_NAME']`, no escrito a mano, para que la app funcione desde cualquier carpeta.
-- Los errores de PDO se muestran con `die()` (solo aceptable en local).
+- Los errores de PDO se muestran con `die()` (solo aceptable en local). *(Cambiado después: ahora se registran con `error_log()` y se responde una página 500 genérica, sin filtrar el DSN.)*
 
 ## Próximo
 **Día 03:** el primer CRUD completo (Equipos) para ver el patrón MVC de extremo a extremo.

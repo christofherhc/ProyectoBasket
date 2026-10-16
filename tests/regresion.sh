@@ -178,7 +178,7 @@ contiene "  avisa del equipo inexistente" "no existe" "$(POSTL "controller=Jugad
 check "posicion fuera de catalogo -> 302" "302" "$(POST "controller=Jugadores&action=guardar" "csrf_token=$TOKEN&nombre=TestPos&numero=1&posicion=ADMIN&equipo_id=1")"
 contiene "  avisa de la posicion invalida" "Posición no válida" "$(POSTL "controller=Jugadores&action=guardar" "csrf_token=$TOKEN&nombre=TestPos&numero=1&posicion=ADMIN&equipo_id=1")"
 check "dorsal 150 -> 302" "302" "$(POST "controller=Jugadores&action=guardar" "csrf_token=$TOKEN&nombre=TestNum&numero=150&posicion=Base&equipo_id=1")"
-contiene "  avisa del limite de dorsal" "entre 1 y" "$(POSTL "controller=Jugadores&action=guardar" "csrf_token=$TOKEN&nombre=TestNum&numero=150&posicion=Base&equipo_id=1")"
+contiene "  avisa del limite de dorsal" "entre 0 y" "$(POSTL "controller=Jugadores&action=guardar" "csrf_token=$TOKEN&nombre=TestNum&numero=150&posicion=Base&equipo_id=1")"
 check "nombre de 200 chars -> 302" "302" "$(POST "controller=Jugadores&action=guardar" "csrf_token=$TOKEN&nombre=$LONG&numero=1&posicion=Base&equipo_id=1")"
 no500 "campo como array no provoca 500" "$(codigo -b "$JAR" -X POST "$BASE?controller=Jugadores&action=guardar" -d "nombre[]=array&equipo_id=1&csrf_token=$TOKEN")"
 
@@ -201,6 +201,11 @@ check "crear jugador valido -> 302" "302" "$(POST "controller=Jugadores&action=g
 R=$(cuerpo -b "$JAR" "$BASE?controller=Jugadores&action=index")
 contiene "  el jugador nuevo aparece" "ZZ Jugador" "$R"
 contiene "  el dorsal no se muestra como 0" "42" "$R"
+# El dorsal 0 es valido (no significa "sin dorsal"); debe guardarse como 0.
+check "dorsal 0 se acepta -> 302" "302" "$(POST "controller=Jugadores&action=guardar" "csrf_token=$TOKEN&nombre=ZZ%20Cero&numero=0&posicion=Base&equipo_id=4")"
+check "  el dorsal 0 se guarda como 0" "0" "$(mysql_valor "SELECT numero FROM jugadores WHERE nombre='ZZ Cero'")"
+# Dorsal repetido en el mismo equipo: mensaje claro en vez del error 1062.
+contiene "  avisa del dorsal duplicado" "ya está en uso" "$(POSTL "controller=Jugadores&action=guardar" "csrf_token=$TOKEN&nombre=ZZ%20Dup&numero=42&posicion=Base&equipo_id=4")"
 check "crear partido valido -> 302" "302" "$(POST "controller=Partidos&action=guardar" "csrf_token=$TOKEN&equipo_local_id=1&equipo_visitante_id=2&puntos_local=95&puntos_visitante=88&fecha=2026-11-01T20:30")"
 R=$(cuerpo -b "$JAR" "$BASE?controller=Partidos&action=index")
 contiene "  el partido nuevo aparece" "95" "$R"

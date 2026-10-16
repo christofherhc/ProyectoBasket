@@ -106,8 +106,14 @@ class Database {
                 ];
                 self::$instancia = new PDO($dsn, DB_USER, DB_PASS, $opciones);
             } catch (PDOException $e) {
-                // En desarrollo mostramos error claro. En producción NO mostrar detalle.
-                die('Error de conexión a base de datos: ' . $e->getMessage());
+                // No se muestra el mensaje de PDO: incluye el DSN (host, nombre
+                // de la base) y detalles internos. Se registra y se responde
+                // con una página 500 genérica.
+                error_log('[ProyectoBasket] Error de conexión: ' . $e->getMessage());
+                http_response_code(500);
+                echo '<h1>Servicio no disponible</h1>'
+                    . '<p>No se pudo conectar con la base de datos. Inténtalo más tarde.</p>';
+                exit;
             }
         }
         return self::$instancia;
@@ -310,7 +316,7 @@ try {
 }
 ```
 
-En `Database.php` usamos `die()` con mensaje claro (suficiente para local).
+En `Database.php` **no** mostramos `$e->getMessage()` al visitante: se registra con `error_log()` y se responde una página 500 genérica. El detalle de PDO incluye el DSN (host y nombre de la base), que no debe filtrarse.
 
 ## 13. Buenas Prácticas PDO (Aplicadas)
 

@@ -88,24 +88,20 @@ if ($fecha === '') {
 }
 ```
 
-**Solo se comprueba que no esté vacía.** No se valida que sea una fecha real. Si alguien envía `fecha=loquesea`, MySQL lo rechazará (o lo guardará como `0000-00-00` según el modo).
-
-⚠️ **Lo que faltaría** es una validación de formato real:
+**No basta con comprobar que no esté vacía.** El proyecto valida además que la fecha **exista de verdad** con `fechaValida()`:
 
 ```php
-$fecha = str_replace('T', ' ', trim($_POST['fecha'] ?? ''));   // el navegador envía T
-$dt = DateTime::createFromFormat('Y-m-d H:i', $fecha);
-if ($dt === false) {
-    $_SESSION['error'] = 'La fecha no tiene un formato válido';
-    header('Location: ' . BASE_URL . '?controller=Partidos&action=crear');
-    exit;
+$fecha = fechaValida($fechaBruta);
+if ($fechaBruta === '') {
+    $errores[] = 'La fecha es obligatoria';
+} elseif ($fecha === null) {
+    $errores[] = 'La fecha indicada no es válida';
 }
-$fecha = $dt->format('Y-m-d H:i:s');
 ```
 
-Ojo con el `str_replace('T', ' ')`: el `<input type="datetime-local">` envía `2026-10-12T19:00`. MySQL lo acepta y lo convierte solo (está verificado), pero ser explícito es más claro y portable.
+`fechaValida()` (en `app/core/helpers.php`) prueba varios formatos con `DateTime::createFromFormat()` y **mira `getLastErrors()`**, porque `createFromFormat()` acepta en silencio fechas imposibles como el 31 de febrero (las "arregla" moviendo el día). Con esto, `fecha=31/02/2026` se rechaza con un mensaje en vez de llegar a MySQL.
 
-### ⚠️ Un bug real: no se comprueba que los equipos existan
+### ⚠️ Un bug real (ya resuelto): no se comprobaba que los equipos existieran
 
 Las validaciones comprueban que los ids sean `> 0` y **distintos**, pero no que un equipo con ese id exista de verdad:
 
@@ -115,19 +111,18 @@ if ($equipoLocalId === $equipoVisitanteId) { ... }           // son distintos
 // ❌ NO se comprueba: ¿existe el equipo 99?
 ```
 
-Si se envía `equipo_local_id=99&equipo_visitante_id=2`, la base **rechaza** el INSERT por clave foránea (error 1452) y el usuario ve un error de SQL en vez de "El equipo seleccionado no existe".
-
-**Cómo se arregla:**
+Si se envía `equipo_local_id=99&equipo_visitante_id=2`, la base **rechaza** el INSERT por clave foránea (error 1452). Antes el usuario veía un error de SQL; ahora se comprueba antes:
 
 ```php
-if (!$this->equipoModel->obtenerPorId($equipoLocalId) || !$this->equipoModel->obtenerPorId($equipoVisitanteId)) {
-    $_SESSION['error'] = 'Uno de los equipos seleccionados no existe';
-    header('Location: ' . BASE_URL . '?controller=Partidos&action=crear');
-    exit;
+if ($this->equipoModel->obtenerPorId($local) === null) {
+    $errores[] = 'El equipo local seleccionado no existe';
+}
+if ($this->equipoModel->obtenerPorId($visitante) === null) {
+    $errores[] = 'El equipo visitante seleccionado no existe';
 }
 ```
 
-**Limitación conocida**, no implementada. La base sigue protegida (el FK funciona), lo que falla es el mensaje al usuario.
+La base sigue siendo la garantía final (el FK no se puede saltar), pero el mensaje ya es el correcto. Y como red de seguridad, el manejador global de `index.php` traduce el 1452 a "El registro seleccionado no existe" si alguna vez se escapa.
 
 ## 4. `editar()`: el `datetime-local`
 
@@ -279,17 +274,17 @@ La lógica de "quién ganó" **no está en el controlador ni en el modelo**: est
 
 ## 8. Limitaciones conocidas de este controlador
 
-| # | Limitación | Gravedad | Arreglo |
+| # | Limitación (ya resuelta) | Gravedad | Arreglo aplicado |
 |---|---|---|---|
-| 1 | No se comprueba que los equipos existan (error de FK sin capturar) | **Alta** | `obtenerPorId()` de ambos antes de guardar |
-| 2 | No se valida el formato de la fecha | Media | `DateTime::createFromFormat()` |
-| 3 | `$puntosLocal = (int)($_POST[...] ?? 0)` no distingue "vacío" de "0" | Baja | Usar `?? ''` y comprobar con `=== ''` |
-| 4 | `actualizar()` redirige a sitios distintos según el error | Baja | Redirigir siempre al formulario |
-| 5 | Mensajes genéricos ("Datos inválidos") | Baja | Especificar qué campo |
-| 6 | ⚠️ `confirm()` del cliente no protegía nada en servidor | Baja | **Resuelto:** formulario POST con token CSRF |
-| 7 | No se comprueba que exista el partido en `actualizar()` | Baja | `obtenerPorId()` antes |
+| 1 | No se comprobaba que los equipos existieran (error de FK sin capturar) | **Alta** | `obtenerPorId()` de ambos antes de guardar |
+| 2 | No se validaba el formato de la fecha | Media | `fechaValida()` con `DateTime::createFromFormat()` |
+| 3 | `$puntosLocal = (int)(...)` no distinguía "vacío" de "0" | Baja | Se valida el texto con `ctype_digit()` antes de convertir |
+| 4 | `actualizar()` redirigía a sitios distintos según el error | Baja | Redirige siempre al formulario de edición |
+| 5 | Mensajes genéricos ("Datos inválidos") | Baja | Cada error indica el campo |
+| 6 | ⚠️ `confirm()` del cliente no protegía nada en servidor | Baja | Formulario POST con token CSRF |
+| 7 | No se comprobaba que existiera el partido en `actualizar()` | Baja | `validarId()` antes |
 
-⚠️ **La 1 es la que más vas a notar.** Intenta registrar un partido eligiendo en el desplegable un equipo que hayas borrado antes (o manipulando la URL con un id inexistente) y verás un error de SQL.
+⚠️ **La 1 era la que más se notaba.** Al registrar un partido con un equipo inexistente salía un error de SQL. Ahora sale "El equipo local seleccionado no existe".
 
 ---
 

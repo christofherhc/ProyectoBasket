@@ -31,8 +31,8 @@ class Partido extends Model {
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
         // execute() devuelve true aunque no se modifique ninguna fila.
         // rowCount() dice si el registro existía, PERO MySQL cuenta filas
-        // *cambiadas*, no filas *encontradas*: si se guarda un equipo sin
-        // tocar nada, rowCount() es 0 aunque el equipo exista de sobra.
+        // *cambiadas*, no filas *encontradas*: si se guarda un partido sin
+        // tocar nada, rowCount() es 0 aunque el partido exista de sobra.
         // Por eso, cuando no cambia nada, se pregunta aparte si el id existe.
         if (!$stmt->execute()) {
             return false;

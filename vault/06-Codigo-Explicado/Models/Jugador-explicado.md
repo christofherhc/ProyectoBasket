@@ -14,7 +14,8 @@ class Jugador extends Model {
                 VALUES (:nombre, :numero, :posicion, :equipo_id)";
         $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':nombre', $nombre, PDO::PARAM_STR);
-        if ($numero === null || $numero === 0) {
+        // null significa "sin dorsal". El 0 SÍ es un dorsal válido.
+        if ($numero === null) {
             $stmt->bindValue(':numero', null, PDO::PARAM_NULL);
         } else {
             $stmt->bindValue(':numero', $numero, PDO::PARAM_INT);
@@ -121,7 +122,7 @@ Con `LEFT JOIN`, `nombre_equipo` **puede ser `null`**, y `htmlspecialchars(null)
 ## 4. El patrón del `NULL`, igual que en `Equipo`
 
 ```php
-if ($numero === null || $numero === 0) {
+if ($numero === null) {
     $stmt->bindValue(':numero', null, PDO::PARAM_NULL);
 } else {
     $stmt->bindValue(':numero', $numero, PDO::PARAM_INT);
@@ -133,7 +134,7 @@ $stmt->bindValue(':posicion', $posicion === '' ? null : $posicion, PDO::PARAM_ST
 
 Dos detalles propios de este modelo:
 
-**a) `$numero === 0` también se trata como `NULL`.** El `0` es un número de camiseta válido, pero como también es el resultado de `(int)''` y de `(int)'abc'`, se interpreta como "sin especificar". El resultado: si escribes `0`, se guarda como `NULL` y se muestra como `—`. **Es una decisión discutible**: en los datos de prueba hay jugadores con camiseta 0 que sí se ven como 0 porque vienen del `seeds.sql` (donde sí se insertó un 0 real). ⚠️ **Es una inconsistencia menor entre lo que inserta el script y lo que hace la aplicación.**
+**a) Solo `null` se trata como "sin dorsal".** El `0` **sí es un dorsal válido** (Coby White y Jayson Tatum lo llevan en los datos de prueba), así que no se puede confundir con "vacío". El controlador es quien decide: si el campo llega vacío pasa `null`; si llega `'0'` pasa `0`. El modelo nunca convierte un `0` en `NULL`. Antes sí lo hacía y era un bug: escribir `0` guardaba `NULL` y se mostraba `—`.
 
 **b) `$posicion === '' ? null : $posicion` usa el ternario.** Aquí no hay `if` porque la transformación es una línea. El operador `?:` sería más corto (`$posicion ?: null`), ⚠️ **pero tiene un problema**: devuelve `null` para cualquier valor "falsy", incluidos `'0'` y `0`. Con el ternario explícito, solo la cadena vacía se convierte en `null`. **Regla: el ternario completo es más seguro que el abreviado.**
 
@@ -207,6 +208,7 @@ CREATE TABLE IF NOT EXISTS jugadores (
   equipo_id INT UNSIGNED NOT NULL COMMENT 'Equipo al que pertenece (FK)',
   creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
   KEY idx_jugador_equipo (equipo_id),
+  UNIQUE KEY uq_numero_por_equipo (equipo_id, numero),
   CONSTRAINT fk_jugador_equipo FOREIGN KEY (equipo_id)
     REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
@@ -214,17 +216,15 @@ CREATE TABLE IF NOT EXISTS jugadores (
 
 **`numero INT UNSIGNED NULL`** → puede ser `NULL` (sin camiseta) pero nunca negativo, porque `UNSIGNED`.
 
-⚠️ **Y aquí no hay `UNIQUE` sobre `(equipo_id, numero)`, que debería haberlo.** En básquetbol, dos jugadores del mismo equipo no pueden llevar la misma camiseta:
+**`UNIQUE KEY uq_numero_por_equipo (equipo_id, numero)`** → en básquetbol, dos jugadores del mismo equipo no pueden llevar la misma camiseta, y el índice lo garantiza a nivel de base de datos. Es la última red: aunque la validación de PHP fallara, la base rechaza el duplicado (error 1062).
 
-```sql
-UNIQUE KEY uq_numero_por_equipo (equipo_id, numero)
-```
+⚠️ **`UNIQUE` con `NULL` tiene un matiz:** en MySQL dos filas con `numero = NULL` **no** se consideran duplicadas, así que un equipo puede tener varios jugadores sin dorsal. Es justo lo que se quiere: "sin número" no choca consigo mismo.
 
-⚠️ **No está implementado.** Consecuencia: puedes crear dos jugadores con camiseta 23 en el mismo equipo y el listado los muestra sin avisar. Es la limitación #2 documentada en `../Controllers/JugadoresController-explicado.md` y está pendiente de resolverse.
+La validación amable vive en el controlador (`existeDorsalEnEquipo()`, explicada en `../Controllers/JugadoresController-explicado.md`), que da un mensaje claro antes de llegar al error de SQL.
 
-**`posicion VARCHAR(50) NULL`** → texto libre, no un `ENUM`. La validación de que sea una de las cinco posiciones válidas **no existe** en el modelo ni en el controlador; solo el `<select>` lo limita. Está documentado como limitación.
+**`posicion VARCHAR(50) NULL`** → texto libre, no un `ENUM`. La validación de que sea una de las cinco posiciones válidas la hace el controlador contra la constante `POSICIONES` de `config.php` (lista blanca con `in_array(..., true)`), y el formulario la ofrece en un `<select>`.
 
-⚠️ **Podría ser `ENUM('Base','Escolta','Alero','Ala-Pívot','Pívot')`**, que haría que **la base** rechazara valores inválidos. Es una alternativa mejor al `VARCHAR` + validación en PHP, aunque menos flexible si luego quieres añadir posiciones.
+⚠️ **Podría ser `ENUM('Base','Escolta','Alero','Ala-Pívot','Pívot')`**, que haría que **la base** rechazara valores inválidos. Es una alternativa al `VARCHAR` + validación en PHP, aunque menos flexible si luego quieres añadir posiciones.
 
 ## 8. Verificación
 
@@ -241,7 +241,7 @@ mysql -u root liga_basquet --batch -e "
 SELECT nombre, IFNULL(numero, 'NULL') AS numero
 FROM jugadores WHERE numero IS NULL;"
 
-# Duplicados de camiseta por equipo (debería dar 0, pero puede dar >0)
+# Duplicados de camiseta por equipo (debe dar 0 siempre)
 mysql -u root liga_basquet --batch -e "
 SELECT equipo_id, numero, COUNT(*) AS veces
 FROM jugadores
@@ -250,9 +250,9 @@ GROUP BY equipo_id, numero
 HAVING COUNT(*) > 1;"
 ```
 
-⚠️ **La tercera consulta es la que revela la limitación.** Si devuelve filas, es que hay dos jugadores con la misma camiseta en el mismo equipo. Con la base de prueba no pasa, pero al crear datos a mano es fácil.
+⚠️ **La tercera consulta es una comprobación de integridad.** Si alguna vez devuelve filas, es que el índice `UNIQUE` no se aplicó (por ejemplo, si la tabla se creó antes de añadirlo). Con el esquema actual debe salir **siempre vacía**: la base no permite dos camisetas iguales en el mismo equipo.
 
-**Verificado:** el listado muestra los 12 jugadores con el nombre de su equipo correcto.
+**Verificado:** el listado muestra los 12 jugadores con el nombre de su equipo correcto y la consulta de duplicados devuelve 0 filas.
 
 ## 9. Errores frecuentes con este modelo
 

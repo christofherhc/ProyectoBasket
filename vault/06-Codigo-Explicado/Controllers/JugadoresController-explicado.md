@@ -126,53 +126,66 @@ En `EquiposController`, la validación es `empty($nombre) || empty($ciudad)`. Aq
 
 **Regla general:** para campos numéricos valida con **comparaciones de rango** (`<= 0`, `< 0`, `> 99`), no con `empty()`. Para campos de texto, `empty()` sí sirve.
 
-**`$numero !== ''` antes de convertir.** Como en `Equipo`, el campo se deja como cadena para distinguir "vacío" de "cero". Con `$numero === '0'`, el `if` **sí** entra, `$numeroInt` vale `0`, y el modelo lo convierte en `NULL` (porque trata `0` como "sin número"). Está bien: se guardó como `NULL`, que es lo correcto para "no informado".
-
-### La validación del `numero`: `< 0 || > 99`
-
-Un rango **razonable**, no arbitrario: en básquetbol las camisetas van de 0 a 99. El `0` es válido (Coby White y Jayson Tatum lo llevan en los datos de prueba), así que el mínimo correcto es `< 0` y no `<= 0`.
-
-⚠️ **No se valida la unicidad del número por equipo.** En la realidad, dos jugadores del mismo equipo no pueden llevar la misma camiseta. Aquí se permitiría. Para añadirlo:
+**`$numero !== ''` antes de convertir.** El campo se deja como cadena para distinguir "vacío" de "cero". Vacío significa **sin dorsal** y se guarda como `NULL`; `'0'` es un dorsal real y se guarda como `0`. El modelo solo convierte a `NULL` cuando recibe `null`, nunca cuando recibe `0`:
 
 ```php
-// En el modelo
-public function numeroExisteEnEquipo(int $equipoId, int $numero, ?int $ignorarId = null): bool {
-    $sql = "SELECT COUNT(*) FROM jugadores WHERE equipo_id = :equipo_id AND numero = :numero";
-    $params = [':equipo_id' => $equipoId, ':numero' => $numero];
-    if ($ignorarId !== null) {
-        $sql .= " AND id != :id";
-        $params[':id'] = $ignorarId;
-    }
-    $stmt = $this->db->prepare($sql);
-    $stmt->execute($params);
+if ($numero === null) {
+    $stmt->bindValue(':numero', null, PDO::PARAM_NULL);
+} else {
+    $stmt->bindValue(':numero', $numero, PDO::PARAM_INT);
+}
+```
+
+### La validación del `numero`: `> 99`
+
+Un rango **razonable**, no arbitrario: en básquetbol las camisetas van de 0 a 99. El `0` es válido (Coby White y Jayson Tatum lo llevan en los datos de prueba), así que la única cota superior es `MAX_CAMISETA`:
+
+```php
+$numeroInt = (int)$numero;
+if ($numeroInt > MAX_CAMISETA) {
+    $errores[] = 'El número de camiseta debe estar entre 0 y ' . MAX_CAMISETA;
+}
+```
+
+⚠️ **`ctype_digit()` ya descarta los negativos.** Antes de convertir se comprueba que el texto sean solo dígitos, así que `-5` se rechaza como "no es un número entero" sin necesidad de comprobar el signo.
+
+### Unicidad del dorsal por equipo: sí se valida
+
+Dos jugadores del mismo equipo no pueden llevar la misma camiseta. El índice `UNIQUE (equipo_id, numero)` de la base ya lo impide, pero **comprobarlo antes permite un mensaje claro** en vez del error 1062 genérico. El modelo tiene:
+
+```php
+public function existeDorsalEnEquipo(int $equipoId, int $numero, int $ignorarId = 0): bool {
+    $sql = "SELECT COUNT(*) FROM {$this->tabla}
+            WHERE equipo_id = :equipo AND numero = :numero AND id <> :ignorar";
+    // ...
     return (int)$stmt->fetchColumn() > 0;
 }
 ```
 
-Fíjate en `$ignorarId`: al **editar**, el jugador que estás editando ya tiene ese número, así que hay que excluirlo de la comprobación. Es un detalle que se olvida y produce el clásico error de "no puedo editar, dice que el número está duplicado".
-
-### `posicion`: se valida en el `<select>`, no en PHP
-
-El campo `posicion` se pasa tal cual, sin comprobar que sea uno de los cinco valores válidos:
+Y el controlador lo consulta dentro de `validarCampos()`:
 
 ```php
-$this->jugadorModel->crear($nombre, $numeroInt, $posicion, $equipoId);
-```
-
-**¿Por qué no se valida?** Porque el `<select>` solo ofrece cinco opciones, y un usuario normal no puede enviar otra cosa. Pero se puede manipular la petición (con `curl`, por ejemplo). Un envío directo podría guardar `"Administrador"` como posición.
-
-**Qué haría falta** (no implementado):
-
-```php
-$posicionesValidas = ['Base', 'Escolta', 'Alero', 'Ala-Pívot', 'Pívot'];
-if ($posicion !== '' && !in_array($posicion, $posicionesValidas, true)) {
-    $_SESSION['error'] = 'Posición no válida';
-    header('Location: ' . BASE_URL . '?controller=Jugadores&action=crear');
-    exit;
+if ($numeroInt !== null && $equipoExiste
+    && $this->jugadorModel->existeDorsalEnEquipo($equipoId, $numeroInt, $ignorarId ?? 0)) {
+    $errores[] = 'Ese número de camiseta ya está en uso en el equipo seleccionado';
 }
 ```
 
-⚠️ **El `true` del tercer parámetro de `in_array()` no es opcional.** Con `in_array($posicion, $posicionesValidas)` y `$posicion = '0'`, compararía `'0' == 'Base'` en PHP 7 y daría un falso positivo. Con `true` la comparación es estricta.
+⚠️ **`$ignorarId` es la clave.** Al **editar**, el jugador que estás modificando ya tiene ese número; si no se excluye, la comprobación lo cuenta como duplicado de sí mismo y no podrías guardar sin cambiarlo. Por eso `actualizar()` llama a `validarCampos($id)` y `guardar()` a `validarCampos(null)`.
+
+### `posicion`: se valida en PHP contra una lista blanca
+
+La columna es `VARCHAR(50)` a propósito (no `ENUM`), así que el valor se contrasta contra la constante `POSICIONES` definida en `config.php`:
+
+```php
+if ($posicion !== '' && !in_array($posicion, POSICIONES, true)) {
+    $errores[] = 'Posición no válida. Opciones: ' . implode(', ', POSICIONES);
+}
+```
+
+El formulario ofrece esas mismas opciones en un `<select>`, pero **la validación no depende de eso**: un envío directo con `curl` podría mandar `posicion=Administrador`, y la lista blanca lo rechaza.
+
+⚠️ **El `true` del tercer parámetro de `in_array()` no es opcional.** Con `in_array($posicion, POSICIONES)` y `$posicion = '0'`, compararía `'0' == 'Base'` en PHP 7 y daría un falso positivo. Con `true` la comparación es estricta.
 
 **Lección general:** nunca confíes en que un `<select>` limite los valores. El HTML se puede manipulation; solo el servidor manda.
 
@@ -251,15 +264,18 @@ porque un nombre con `<` rompería el HTML. Está verificado con un usuario llam
 
 ## 8. Limitaciones conocidas de este controlador
 
-| # | Limitación | Gravedad | Arreglo |
-|---|---|---|---|
-| 1 | No se valida que la `posicion` sea una de las 5 válidas | Media | `in_array($posicion, $validas, true)` |
-| 2 | No se valida la unicidad del número por equipo | Media | Consulta con `ignorarId` al editar |
-| 3 | `actualizar()` no comprueba que exista el jugador | Baja | `obtenerPorId()` antes |
-| 4 | No se valida `strlen($nombre) > 100` | Baja | Validar en PHP |
-| 5 | ⚠️ `confirm()` del cliente no protegía nada en servidor | Baja | **Resuelto:** formulario POST con token CSRF |
+Todas las que se listaban aquí **ya están resueltas**; se conservan como referencia del punto de partida:
 
-⚠️ **La 2 es un bug de datos real:** puedes crear dos jugadores con la camiseta 23 en el mismo equipo, y el listado los mostrará sin avisar de nada.
+| # | Limitación (ya resuelta) | Gravedad | Arreglo aplicado |
+|---|---|---|---|
+| 1 | No se validaba que la `posicion` fuera una de las 5 válidas | Media | `in_array($posicion, POSICIONES, true)` en el controlador |
+| 2 | No se validaba la unicidad del número por equipo | Media | `existeDorsalEnEquipo()` con `$ignorarId` al editar |
+| 3 | `actualizar()` no comprobaba que existiera el jugador | Baja | `validarId()` antes de guardar |
+| 4 | No se validaba `strlen($nombre) > 100` | Baja | `cabeEnColumna()` contra `MAX_NOMBRE` |
+| 5 | ⚠️ `confirm()` del cliente no protegía nada en servidor | Baja | Formulario POST con token CSRF |
+| 6 | El dorsal 0 se confundía con "sin dorsal" | Media | `0` es válido; solo `null` significa "sin dorsal" |
+
+⚠️ **La 2 era un bug de datos real:** se podían crear dos jugadores con la camiseta 23 en el mismo equipo. Ahora lo bloquean a la vez la validación del controlador (mensaje claro) y el índice `UNIQUE` de la base (garantía final).
 
 ---
 

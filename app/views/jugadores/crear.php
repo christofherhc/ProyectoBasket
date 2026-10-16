@@ -14,7 +14,14 @@
 
     <div class="form-group">
         <label for="posicion">Posición</label>
-        <input type="text" id="posicion" name="posicion" placeholder="Base, Escolta, Alero, Ala-Pívot, Pívot" value="<?= isset($old['posicion']) ? htmlspecialchars($old['posicion']) : '' ?>">
+        <select id="posicion" name="posicion">
+            <option value="">-- Sin posición --</option>
+            <?php foreach (POSICIONES as $pos): ?>
+                <option value="<?= e($pos) ?>" <?= isset($old['posicion']) && $old['posicion'] === $pos ? 'selected' : '' ?>>
+                    <?= e($pos) ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
     </div>
 
     <div class="form-group">

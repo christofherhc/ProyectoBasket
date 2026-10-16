@@ -478,15 +478,21 @@ Alternativa más limpia: contar los dependientes antes de borrar y mostrar un av
 
 **Causa:** `Router::cargarController()` compone el mensaje de error con `$nombreClase`, que viene de la URL sin escapar, y lo imprime con `die()`.
 
-**✅ Solución aplicada:** escapar en la salida **o**, mejor, no imprimir el nombre del archivo en absoluto:
+**✅ Solución aplicada:** escapar en la salida **o**, mejor, no imprimir el nombre del archivo en absoluto. La versión final va más allá: el Router **no imprime ningún dato de la URL** y responde con un método `error()` que devuelve 404 y un mensaje fijo.
 
 ```php
-die('Error: controlador no encontrado.');           // lo ideal
-die('Error: controlador no encontrado: '
-    . htmlspecialchars($nombreClase, ENT_QUOTES, 'UTF-8'));
+// Opción mínima: no imprimir el dato
+die('Error: controlador no encontrado.');
+
+// Lo que quedó implementado: 404 con página propia y mensaje fijo
+private function error(string $mensaje): void {
+    http_response_code(404);
+    echo '<h1>Petición no válida</h1><p>' . e($mensaje) . '</p>';
+    exit;
+}
 ```
 
-⚠️ **Escapar al imprimir, no al entrar:** el valor se usa además para construir la ruta del archivo, así que la validación correcta sigue siendo una lista blanca de nombres permitidos.
+⚠️ **Escapar al imprimir, no al entrar:** el valor se usa además para construir la ruta del archivo, así que la validación correcta sigue siendo una lista blanca de nombres permitidos (la constante `RUTAS`).
 
 ---
 
@@ -501,13 +507,16 @@ $ curl -H 'Host: evil.example.com' 'http://localhost/.../?controller=Auth&action
 Location: http://evil.example.com/ProyectoBasket-Deploy/public/?controller=Auth&action=register
 ```
 
-**✅ Solución aplicada:** no derivar la URL pública del request. Definirla a mano:
+**✅ Solución aplicada:** no derivar la URL pública del request. `config.php` calcula solo la **ruta** desde `SCRIPT_NAME` (y la sanea con `preg_replace`), nunca el dominio:
 
 ```php
-define('BASE_URL', '/ProyectoBasket-Deploy/public');  // ruta, no dominio
+$script  = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
+$carpeta = str_replace('\\', '/', dirname($script));
+$carpeta = preg_replace('~[^A-Za-z0-9_\-/]~', '', $carpeta) ?? '';
+define('BASE_URL', rtrim($carpeta, '/') . '/');   // ruta, no dominio
 ```
 
-Si hace falta dominio, validar `HTTP_HOST` contra una lista blanca. Mientras tanto, **no abras el proyecto a Internet.**
+Si en algún momento hiciera falta el dominio, habría que validar `HTTP_HOST` contra una lista blanca. Mientras tanto, **no abras el proyecto a Internet.**
 
 ---
 
@@ -524,16 +533,15 @@ $nombre = isset($_POST['nombre']) && is_string($_POST['nombre'])
     ? trim($_POST['nombre']) : '';
 ```
 
-En el Router, lo ideal es una lista blanca:
+En el Router, la lista blanca quedó como constante `RUTAS` (controlador → acciones permitidas), y el rechazo usa `error()` con 404 en vez de `die()`:
 
 ```php
-$permitidos = ['auth', 'equipos', 'jugadores', 'partidos', 'estadisticas'];
-if (!in_array($nombre, $permitidos, true)) {
-    die('Controlador no permitido.');
+if (!array_key_exists($controlador, self::RUTAS)) {
+    $this->error('Controlador no permitido.');
 }
 ```
 
-⚠️ El mismo `method_exists()` del Router permite llamar a métodos **protegidos**: `?action=view` y `?action=requiereLogin` dan 500, y `?action=__construct` responde 200. Lo correcto es `is_callable([$controlador, $accion])`.
+⚠️ **`method_exists()` también permitía llamar a métodos protegidos** (`?action=view`, `?action=requiereLogin`). Se sustituyó por `is_callable([$controlador, $accion])`, que solo acepta lo invocable desde fuera.
 
 ---
 

@@ -14,7 +14,7 @@
 
     <div class="form-group">
         <label for="fundacion">Año de Fundación</label>
-        <input type="number" id="fundacion" name="fundacion" min="1800" max="<?= date('Y') ?>" value="<?= isset($old['fundacion']) && $old['fundacion'] !== '' ? htmlspecialchars((string)$old['fundacion']) : '' ?>">
+        <input type="number" id="fundacion" name="fundacion" min="<?= FUNDACION_MIN ?>" max="<?= date('Y') ?>" value="<?= isset($old['fundacion']) && $old['fundacion'] !== '' ? htmlspecialchars((string)$old['fundacion']) : '' ?>">
     </div>
 
     <button type="submit" class="btn">Guardar</button>

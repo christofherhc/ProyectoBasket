@@ -263,28 +263,28 @@ docs: documenta los errores encontrados en la verificación final
 8. **Verificar solo la interfaz no basta.** La integridad referencial se comprueba con SQL, no mirando el HTML.
 9. **La documentación desactualizada es un bug documentado.** Enseñar la versión antigua del schema habría hecho que el lector importara un script que da error.
 
-## 9. Limitaciones pendientes (al cerrar el proyecto)
+## 9. Limitaciones detectadas al cerrar la verificación
 
-Todo esto se detectó durante la verificación y **no se implementó**:
+Todo esto se detectó durante la verificación del día 8. La columna **"Estado"** indica qué pasó después: casi todas se corrigieron en la **auditoría de seguridad** posterior (ver `../08-Errores-y-Soluciones/Seguridad-y-robustez.md`).
 
-| # | Limitación | Gravedad | Módulo |
-|---|---|---|---|
-| 1 | **Borrar un equipo con jugadores/partidos da error de FK sin capturar** | **Alta** | Equipos |
-| 2 | No se comprueba que los equipos existan al crear un partido (error FK) | Alta | Partidos |
-| 3 | No se valida la `posicion` contra la lista de 5 válidas | Media | Jugadores |
-| 4 | No se valida la unicidad del número de camiseta por equipo | Media | Jugadores |
-| 5 | Los equipos sin partidos no aparecen en las estadísticas | Media | Estadísticas |
-| 6 | No se valida el formato de la fecha con `DateTime` | Media | Partidos |
-| 7 | `actualizar()` no comprueba que el registro exista | Baja | Los 3 CRUD |
-| 8 | `eliminar()` por GET (la confirmación es solo de `confirm()` en JS) | Baja | Los 3 CRUD |
-| 9 | No hay protección CSRF | Media | Todos |
-| 10 | No hay control de roles (todo usuario ve todo) | Baja | Auth |
-| 11 | `Router` usa `die()` sin escapar el nombre del `$_GET` | Baja | Core |
-| 12 | `$puntosLocal = (int)($_POST[...] ?? 0)` confunde "vacío" con "0" | Baja | Partidos |
+| # | Limitación | Gravedad | Módulo | Estado |
+|---|---|---|---|---|
+| 1 | **Borrar un equipo con jugadores/partidos da error de FK sin capturar** | **Alta** | Equipos | ✅ Resuelto |
+| 2 | No se comprueba que los equipos existan al crear un partido (error FK) | Alta | Partidos | ✅ Resuelto |
+| 3 | No se valida la `posicion` contra la lista de 5 válidas | Media | Jugadores | ✅ Resuelto |
+| 4 | No se valida la unicidad del número de camiseta por equipo | Media | Jugadores | ✅ Resuelto |
+| 5 | Los equipos sin partidos no aparecen en las estadísticas | Media | Estadísticas | ⏳ Pendiente |
+| 6 | No se valida el formato de la fecha con `DateTime` | Media | Partidos | ✅ Resuelto |
+| 7 | `actualizar()` no comprueba que el registro exista | Baja | Los 3 CRUD | ✅ Resuelto |
+| 8 | `eliminar()` por GET (la confirmación es solo de `confirm()` en JS) | Baja | Los 3 CRUD | ✅ Resuelto |
+| 9 | No hay protección CSRF | Media | Todos | ✅ Resuelto |
+| 10 | No hay control de roles (todo usuario ve todo) | Baja | Auth | ⏳ Pendiente |
+| 11 | `Router` usa `die()` sin escapar el nombre del `$_GET` | Baja | Core | ✅ Resuelto |
+| 12 | `$puntosLocal = (int)($_POST[...] ?? 0)` confunde "vacío" con "0" | Baja | Partidos | ✅ Resuelto |
 
-⚠️ **La 1 es la más visible al usar la aplicación.** Los 4 equipos de `seeds.sql` tienen jugadores y partidos, así que intentar borrar cualquiera de ellos **siempre** produce un error de FK.
+⚠️ **La 1 era la más visible al usar la aplicación.** Los 4 equipos de `seeds.sql` tienen jugadores y partidos, así que intentar borrar cualquiera de ellos producía un error de FK. La versión final comprueba las dependencias antes de borrar (ver `EquiposController::eliminar()`).
 
-**El arreglo (documentado pero no implementado):**
+**El arreglo que se implementó** (opción A: comprobar antes de borrar):
 ```php
 // Opción A — comprobar antes de borrar
 if ($this->equipoModel->tieneRegistros($id)) {
@@ -308,16 +308,15 @@ try {
 |---|---|
 | Módulos | 5 (auth, equipos, jugadores, partidos, estadísticas) |
 | Archivos PHP | 22 |
-| Tablas | 4, con 3 claves foráneas |
-| Pruebas funcionales | **81 / 81 superadas** |
-| Seguridad | Prepared statements, bcrypt, escapado de salida, sesiones regeneradas |
+| Tablas | 4, con 3 claves foráneas y un índice `UNIQUE` |
+| Pruebas funcionales | **87 / 87 superadas** |
+| Seguridad | Prepared statements, bcrypt, escapado de salida, sesiones regeneradas, CSRF, lista blanca `RUTAS`, validación en servidor |
 | Documentación | Vault de 10 secciones, 15 archivos de código explicado, 8 procedimientos |
 | Git | Historial limpio con commits atómicos y mensajes descriptivos |
 
 **Pendiente fuera del alcance del código:**
-- Conectar con un remoto de GitHub.
+- Conectar con un remoto de GitHub (queda por configurar el `remote`).
 - Demostrar el trabajo con ramas y Pull Requests.
-- Generar el ZIP de entrega con la carpeta `.git` incluida.
 
 ---
 

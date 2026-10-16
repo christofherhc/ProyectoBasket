@@ -173,18 +173,21 @@ Una conexión persistente se guarda en un "pool" y se reutiliza entre peticiones
 
 ```php
 } catch (PDOException $e) {
-    die('Error de conexión a la base de datos: ' . $e->getMessage());
+    // No se muestra el mensaje de PDO: incluye el DSN (host, nombre de la
+    // base) y detalles internos que no debe ver un visitante.
+    error_log('[ProyectoBasket] Error de conexión: ' . $e->getMessage());
+    http_response_code(500);
+    echo '<h1>Servicio no disponible</h1>'
+        . '<p>No se pudo conectar con la base de datos. Inténtalo más tarde.</p>';
+    exit;
 }
 ```
 
-**Qué está bien aquí:** la conexión se intenta dentro de un `try`, así que un fallo de MySQL no produce un error críptico de PHP, sino un mensaje que dice qué pasó.
+**Qué está bien aquí:** la conexión se intenta dentro de un `try`, así que un fallo de MySQL no produce un error críptico de PHP.
 
-**⚠️ Y lo que habría que mejorar en producción:**
+**El detalle va al log, no al navegador.** `error_log()` guarda el mensaje real (con el DSN, el host y el nombre de la base) donde lo ve el administrador, y el visitante recibe una página **500** con un texto fijo. Así se depura igual de bien sin filtrar información interna.
 
-1. **Muestra el mensaje real** (`getMessage()`). En un entorno real eso puede filtrar el nombre de la base, el usuario o la ruta interna. En producción se registra en el log del servidor y se muestra algo genérico: "Error de conexión. Inténtalo más tarde."
-2. **`die()` mata el proceso.** Para una web sería mejor registrar el error y mostrar una página amigable.
-
-**Qué lo hace aceptable en este proyecto:** es un trabajo local, con datos de prueba y sin información sensible. Y para aprender, ver el mensaje exacto del error es una ventaja enorme.
+**⚠️ Esto se cambió en la auditoría.** Antes era `die('Error de conexión a la base de datos: ' . $e->getMessage())`, que volcaba el detalle de PDO (incluido el DSN) directamente en la respuesta. Ver `../../08-Errores-y-Soluciones/Registro-de-errores.md` (#20).
 
 ## 6. Cómo lo usa el resto del código
 

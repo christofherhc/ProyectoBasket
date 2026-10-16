@@ -76,6 +76,8 @@ Router se encarga de:
 
 ### Implementación explicada paso a paso
 
+> ⚠️ **Nota importante:** el código de esta sección es la **primera versión didáctica** del Router (la que se escribió al empezar). Sirve para entender el mecanismo, pero **el Router real del proyecto ha evolucionado** tras la auditoría de seguridad: ahora usa una lista blanca `RUTAS`, `is_callable()` en vez de `method_exists()`, los helpers `get()`/`post()` y un método `error()` que devuelve 404 con página propia en vez de `die()`. La versión definitiva está en `app/core/Router.php` y se explica en `../../06-Codigo-Explicado/Core/Router-explicado.md`.
+
 ```php
 <?php
 
@@ -280,11 +282,9 @@ class EquiposController extends Controller {
 
 ## 9. Validación de Rutas (Seguridad Básica)
 
-Router actual hace `die()` con errores. En desarrollo OK (explicativo). En producción ideal manejar 404.
+> ✅ **Actualizado:** el Router ya no hace `die()`. La versión definitiva valida la URL contra la lista blanca `RUTAS` **antes de cargar nada** y, si algo no cuadra, llama a `error()`, que responde **404 con una página propia** (y nunca imprime el valor recibido de la URL). El `die()` que se ve en el código didáctico de la sección 5 era claro para aprender, pero en producción filtra rutas y no da una página decente.
 
-Para aprendizaje, mensajes `die()` son **claros** (ves qué falla: controlador o método no existe).
-
-Podemos mejorar después con manejo de errores, pero no necesario para práctica.
+Lo que sí se mantiene de esta sección: el `(int)` al leer un `id` sigue siendo obligatorio. `?id=abc` llega al controlador como texto; es el controlador quien hace `(int)` y comprueba `> 0`. La lista blanca del Router dice *qué* controlador y *qué* acción existen; la validación de los datos concretos vive en cada controlador.
 
 ## 10. Caso Práctico: Formulario POST
 

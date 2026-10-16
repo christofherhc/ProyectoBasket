@@ -20,6 +20,11 @@ define('MAX_CIUDAD', 100);       // equipos.ciudad
 define('MAX_CAMISETA', 99);      // jugadores.numero
 define('MAX_PUNTOS', 999);       // partidos.puntos_local / puntos_visitante
 
+// Año de fundación mínimo. equipos.fundacion es YEAR, cuyo rango real en
+// MySQL/MariaDB empieza en 1901; permitir 1800 no serviría porque la columna
+// no puede guardarlo. El máximo es el año actual y se calcula al validar.
+define('FUNDACION_MIN', 1901);
+
 // Posiciones admitidas. La columna es VARCHAR (no ENUM) a propósito,
 // así que la lista blanca vive aquí y se valida en el controlador.
 define('POSICIONES', ['Base', 'Escolta', 'Alero', 'Ala-Pívot', 'Pívot']);

@@ -44,18 +44,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 **Por qué importa.** Sin esta comprobación, entrar a `?controller=Auth&action=login` con un simple clic en la barra de direcciones intentaría procesar un login con datos vacíos y mostraría un error en vez de redirigir al formulario.
 
-Esta es una **buena práctica de diseño de rutas**: las acciones que procesan formularios (`login`, `guardar`, `actualizar`, `eliminar`) solo deben responder a `POST`. Es más seguridad y menos código:
+Esta es una **buena práctica de diseño de rutas**: las acciones que procesan formularios (`login`, `guardar`, `actualizar`, `eliminar`) solo deben responder a `POST`. Es más seguridad y menos código. En el proyecto esto lo resuelve el helper `exigirPost()`, que además valida el token CSRF:
 
 ```php
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: ' . BASE_URL . '?controller=Equipos&action=crear');
-    exit;
+function exigirPost(string $destino, bool $csrf = true): void {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        redir($destino);        // un GET redirige, no procesa nada
+    }
+    if ($csrf) {
+        exigirCsrf();           // y sin token válido responde 403
+    }
 }
 ```
 
 Verificado en las pruebas: pedir `action=guardar` por GET redirige al formulario **y no crea ningún registro**.
 
-⚠️ Nota: `eliminar()` **sí** la tiene. Antes el borrado era un enlace `GET`; tras la auditoría todos los formularios de borrado son POST con token CSRF, así que la comprobación se aplica igual: eliminar por GET es mala práctica (ver más abajo), pero es lo habitual en proyectos sencillos.
+⚠️ Nota: `eliminar()` también usa `exigirPost()`. Todos los borrados son POST con token CSRF; un `?action=eliminar&id=1` por GET redirige sin borrar nada.
 
 ### Paso 2: leer y limpiar los datos
 
@@ -253,18 +257,21 @@ Son cuatro pasos, y **los cuatro importan**:
 
 **Verificado:** tras el logout, la petición a un módulo protegido devuelve el login.
 
-⚠️ **Lo que NO se hace:** invalidar los tokens CSRF, porque no hay CSRF en esta versión. Es una limitación conocida y documentada.
+⚠️ **El logout es por POST con token CSRF.** `logout()` empieza con `exigirPost(...)`, así que un enlace `GET` no cierra la sesión: redirige sin más. Antes era un `<a href>` y cualquiera podía cerrarte la sesión con un `<img src="...logout">` en una página ajena. Ahora el botón del layout es un formulario POST con `csrfCampo()`, y una petición GET a `?action=logout` responde 302 sin destruir nada.
 
-⚠️ **Práctica pendiente:** un logout real se debería hacer por **POST**, no por un enlace GET. Con un GET, cualquiera puede cerrar tu sesión con un `<img src="...logout">` en una página ajena. Es una molestia menor, no un robo de datos, pero es una mejora conocida.
+⚠️ **El token CSRF no hay que "invalidarlo" al salir.** Al hacer `session_destroy()` el token guardado en la sesión desaparece con ella. Como el token vive en `$_SESSION`, destruir la sesión ya lo invalida.
 
 ## 5. Cómo se relaciona con el layout
 
 El layout (`app/views/layouts/main.php`) muestra el nombre del usuario y el botón de salir usando lo que guardó este controlador:
 
 ```php
-<?php if (isset($_SESSION['nombre'])): ?>
-    <span>Hola, <?= htmlspecialchars($_SESSION['nombre']) ?></span>
-    <a href="<?= BASE_URL ?>?controller=Auth&action=logout">Salir</a>
+<?php if (isset($_SESSION['logueado']) && $_SESSION['logueado']): ?>
+    <span>Hola, <?= e($_SESSION['nombre']) ?></span>
+    <form action="<?= BASE_URL ?>?controller=Auth&action=logout" method="POST" class="inline-form">
+        <?= csrfCampo() ?>
+        <button type="submit" class="btn-link">Cerrar Sesión</button>
+    </form>
 <?php endif; ?>
 ```
 

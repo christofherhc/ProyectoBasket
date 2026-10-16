@@ -29,22 +29,23 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
 
-// URL base de la aplicación (detectada automáticamente)
+// URL base de la aplicación (solo la RUTA, nunca el dominio)
 if (PHP_SAPI === 'cli') {
-    define('BASE_URL', 'http://localhost/ProyectoBasket/public/');
+    define('BASE_URL', '/ProyectoBasket/public/');
 } else {
-    $esHttps  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-    $esquema  = $esHttps ? 'https' : 'http';
-    $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $carpeta  = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/');
-    define('BASE_URL', $esquema . '://' . $host . $carpeta . '/');
+    $script  = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
+    $carpeta = str_replace('\\', '/', dirname($script));
+    $carpeta = preg_replace('~[^A-Za-z0-9_\-/]~', '', $carpeta) ?? '';
+    $carpeta = trim($carpeta, '/');
+    $carpeta = $carpeta === '' ? '' : '/' . $carpeta;
+    define('BASE_URL', $carpeta . '/');
 }
 
 // Zona horaria para fechas
 date_default_timezone_set('America/Lima');
 ```
 
-⚠️ **`BASE_URL` es una URL COMPLETA, no una ruta.** Se construye con tres partes: esquema (`http` o `https`) + host + carpeta. Todo el proyecto la usa igual:
+⚠️ **`BASE_URL` es una RUTA, no una URL completa.** Se calcula con `dirname($_SERVER['SCRIPT_NAME'])` (la carpeta desde la que se sirvió el script, por ejemplo `/ProyectoBasket/public`). Todo el proyecto la concatena igual:
 
 ```php
 header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
@@ -53,11 +54,13 @@ header('Location: ' . BASE_URL . '?controller=Equipos&action=index');
 <a href="<?= BASE_URL ?>css/styles.css">
 ```
 
-⚠️ **Se calcula, no se escribe a mano.** `dirname($_SERVER['SCRIPT_NAME'])` da la carpeta desde la que se sirvió el script: `/ProyectoBasket/public`. Si mañana la app se mueve a la raíz del servidor o a otra carpeta, el mismo código sigue funcionando. Escribir `define('BASE_URL', 'http://localhost/ProyectoBasket/public/')` a mano funcionaría **hasta el día que se mueve la carpeta**, y entonces los 30 `header('Location:')` del proyecto darían error a la vez.
+> ⚠️ **Cambio importante respecto al día 2:** la primera versión sí construía una URL completa con `$_SERVER['HTTP_HOST']` (el header `Host` que envía el cliente). Eso es **host header injection**: un atacante podía mandar `Host: evil.com` y lograr que las redirecciones apuntaran a un sitio ajeno. La versión definitiva **no toca `HTTP_HOST`** y devuelve solo la ruta; el navegador añade el dominio correcto al resolver un enlace relativo. Ver `../../08-Errores-y-Soluciones/Registro-de-errores.md` (#18).
 
-⚠️ **El caso `PHP_SAPI === 'cli'`.** Cuando el script se ejecuta por consola (o con el servidor embebido de PHP), `$_SERVER['HTTP_HOST']` no existe. El `if` da un valor por defecto en lugar de producir un error. Es una guarda pequeña que evita que la app se rompa al usarla desde la terminal.
+⚠️ **La carpeta se sanea con una expresión regular.** `preg_replace('~[^A-Za-z0-9_\-/]~', '', ...)` elimina cualquier carácter que no pueda aparecer en una ruta segura, para que un `SCRIPT_NAME` manipulado no inyecte nada.
 
-⚠️ **La detección de HTTPS.** `$_SERVER['HTTPS']` no es `false` sino `'off'` cuando hay HTTPS pero el servidor lo publica así. Por eso el código comprueba **las dos** cosas: que exista y que no sea `'off'`.
+⚠️ **Se calcula, no se escribe a mano.** Si mañana la app se mueve a la raíz del servidor o a otra carpeta, el mismo código sigue funcionando. Escribir la ruta a mano funcionaría **hasta el día que se mueve la carpeta**, y entonces los 30 `header('Location:')` del proyecto darían error a la vez.
+
+⚠️ **El caso `PHP_SAPI === 'cli'`.** Cuando el script se ejecuta por consola no hay petición HTTP, así que `$_SERVER['SCRIPT_NAME']` y `HTTP_HOST` no existen. La rama `cli` define la ruta directamente y evita el error.
 
 ⚠️ **`date_default_timezone_set('America/Lima')`.** Sin esto, PHP usa la zona horaria del servidor. Con PHP 8 el aviso es explícito, y las fechas de los partidos se mostrarían desplazadas. **Esta línea va en la configuración, no en cada vista que imprima una fecha.**
 
@@ -137,30 +140,33 @@ return $resultado === false ? null : $resultado;
 ```php
 class Controller {
     protected function view(string $vista, array $datos = []): void {
-        $ruta = __DIR__ . '/../views/' . $vista . '.php';
-        if (!file_exists($ruta)) { die('Vista no encontrada'); }
-        extract($datos);
-        require $ruta;
+        // Extraer datos para convertir claves en variables
+        if (!empty($datos)) {
+            extract($datos, EXTR_SKIP);
+        }
+
+        // Cargar layout principal (contiene header, nav, footer)
+        require_once __DIR__ . '/../views/layouts/main.php';
     }
 
     protected function requiereLogin(): void {
         if (!isset($_SESSION['usuario_id'])) {
-            header('Location: ' . BASE_URL . '?controller=Auth&action=login');
-            exit;
+            flashError('Debes iniciar sesión para acceder a esta página');
+            redir('controller=Auth&action=index');
         }
     }
 }
 ```
 
-⚠️ **`extract($datos)` convierte el array en variables.** Si pasas `['titulo' => 'Equipos']`, dentro de la vista existe `$titulo`. Es cómodo para aprender, pero tiene un riesgo: si el array contiene una clave llamada `ruta` o `datos`, **pisa** la variable local. Por eso el proyecto pasa siempre arrays associative con nombres propios.
+⚠️ **`view()` no carga la vista directamente: carga el layout, y el layout incluye la vista.** Por eso `$vista` (el nombre que llega, por ejemplo `'equipos/index'`) queda disponible para `layouts/main.php`, que es quien hace el `require_once` de `__DIR__ . '/../' . $vista . '.php'`. Separar layout y vista permite que cabecera, navegación y mensajes flash se escriban una sola vez.
 
-⚠️ **Aquí NO se usa `__DIR__`, y es una fragilidad real.** El `require` es `require_once '../app/views/layouts/main.php'`: una ruta **relativa**. PHP la resuelve contra el **directorio de trabajo** del proceso, no contra el archivo que la ejecuta, así que funciona únicamente porque Apache sirve el proyecto con el directorio de trabajo en `public/`.
+⚠️ **`extract($datos, EXTR_SKIP)` convierte el array en variables, pero sin pisar las existentes.** Si pasas `['titulo' => 'Equipos']`, dentro de la vista existe `$titulo`. El flag `EXTR_SKIP` evita el riesgo del `extract` a secas: si el array trajera una clave `vista` o `datos`, **no** sobrescribiría la variable local del método. Es una salvaguarda que se añadió en la auditoría.
 
-Lo correcto sería `require_once __DIR__ . '/../views/layouts/main.php'`, que funciona desde cualquier carpeta. Es exactamente lo mismo que hace `public/index.php`, que **sí** usa `__DIR__` en sus cinco `require`. El proyecto es inconsistente: el punto de entrada es robusto y todo lo demás depende del directorio de trabajo.
+⚠️ **Todas las rutas usan `__DIR__`.** `require_once __DIR__ . '/../views/layouts/main.php'` y, dentro del layout, `__DIR__ . '/../' . $vista . '.php'`. `__DIR__` es la carpeta del archivo que se está ejecutando, así que funciona sin depender del directorio de trabajo de PHP. Antes algunos `require` eran relativos (`../app/views/...`) y solo funcionaban porque Apache arrancaba con el directorio de trabajo en `public/`; con `php -S` desde otra carpeta habrían fallado.
 
-⚠️ **Cómo comprobarlo:** `getcwd()` devuelve el directorio de trabajo. Con Apache en XAMPP es `public/`. Si algún día se ejecuta la app desde otro sitio (`php -S localhost:8000 -t public` lanzado desde la raíz, o un script CLI), estos `require` fallan con "Failed to open stream".
+⚠️ **Si la vista no existe, no se imprime la ruta del disco.** El layout muestra un `<h2>Error: Vista no encontrada</h2>` genérico en vez de revelar rutas internas del servidor.
 
-⚠️ **La protección va en el controlador, no en el Router.** `Router` no sabe qué acciones son públicas (login, registro) y cuáles privadas. Si la metiera en el Router, tendría que mantener una lista de excepciones, y cada acción nueva que se olvide de añadir a esa lista quedaría desprotegida.
+⚠️ **La protección va en el controlador, no en el Router.** `Router` no sabe qué acciones son públicas (login, registro) y cuáles privadas. Si la metiera en el Router, tendría que mantener una lista de excepciones, y cada acción nueva que se olvide de añadir a esa lista quedaría desprotegida. `requiereLogin()` usa los helpers `flashError()` y `redir()` en lugar de `header()` + `exit` sueltos.
 
 ### Paso 2.5: `app/core/Router.php`
 
@@ -236,7 +242,11 @@ $this->params = ['id' => '7'];   // sin 'controller' ni 'action'
 
 ⚠️ **Las tres comprobaciones de `die()`** (controlador no encontrado, clase no encontrada, método inexistente) son lo que evita la pantalla en blanco. Sin ellas, un error de nombre en la URL produciría un "Class not found" de PHP en crudo.
 
-⚠️ **`die()` sin `htmlspecialchars()` en el nombre.** `$this->actionNombre` viene de `$_GET` y se imprime en el mensaje de error. Con `?action=<script>alert(1)</script>` eso sería XSS reflejado. Está anotado como limitación pendiente del proyecto.
+> ✅ **Actualizado en la auditoría (ver `../../08-Errores-y-Soluciones/Seguridad-y-robustez.md`):** estos `die()` se sustituyeron por un método `error()` que responde **404 con página propia** y no imprime nunca el valor de la URL. Además, el Router ahora contrasta `controller`/`action` contra la lista blanca `RUTAS` **antes de cargar el archivo**, y usa `is_callable()` en vez de `method_exists()` (que aceptaba métodos `protected`). El código de arriba es la versión del día 2, conservada como referencia.
+
+⚠️ **`die()` sin `htmlspecialchars()` en el nombre.** `$this->actionNombre` viene de `$_GET` y se imprime en el mensaje de error. Con `?action=<script>alert(1)</script>` eso sería XSS reflejado.
+
+> ✅ **Ya no aplica:** el Router definitivo no imprime el nombre de la acción ni ningún dato de la URL; el mensaje de `error()` es fijo y la propia lista blanca rechaza cualquier acción que no exista.
 
 ### Paso 2.6: `public/index.php` — el front controller
 
@@ -434,12 +444,12 @@ feat: añade core MVC, config, front controller y auth base
 
 ## 10. Dudas pendientes
 
-⚠️ **De este día quedaron vivos dos problemas que no se resolverían hasta el día 08:**
+⚠️ **De este día quedaron vivos dos problemas, que se resolvieron en la auditoría de seguridad (día 08):**
 
 | # | Problema | Se resolvió |
 |---|---|---|
-| 1 | `Router` hace `die()` con datos de `$_GET` sin escapar → XSS reflected | No (anotado como limitación baja) |
-| 2 | `Database` muestra `getMessage()` en producción → filtra nombre de BD y rutas | No (anotado; aceptable en local) |
+| 1 | `Router` hacía `die()` con datos de `$_GET` sin escapar → XSS reflected | ✅ Sí: `error()` con 404 y mensaje fijo + lista blanca `RUTAS` |
+| 2 | `Database` mostraba `getMessage()` en producción → filtraba nombre de BD y rutas | ✅ Sí: `error_log()` + página 500 genérica |
 
 ## 11. Próximos pasos
 
