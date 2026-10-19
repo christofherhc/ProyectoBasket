@@ -22,6 +22,7 @@ ProyectoBasket/
 │   │   ├── Model.php           # Clase base para modelos (CRUD común)
 │   │   ├── Controller.php      # Clase base para controladores (método view)
 │   │   ├── Router.php          # Enrutamiento + Front Controller logic
+│   │   ├── LimitadorIntentos.php # Bloqueo de intentos de login (por IP, en disco)
 │   │   └── helpers.php         # Funciones compartidas: CSRF, flash, validación
 │   │
 │   ├── models/                 # Modelos (acceso a datos + lógica negocio)

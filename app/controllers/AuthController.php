@@ -42,7 +42,9 @@ class AuthController extends Controller {
         }
 
         // Bloqueo temporal tras 5 intentos fallidos en 15 minutos.
-        if (loginBloqueado()) {
+        // El contador está en el servidor, identificado por la IP: si estuviera
+        // en la sesión, el atacante solo tendría que dejar de mandar la cookie.
+        if (LimitadorIntentos::estaBloqueado(self::claveDeBloqueo())) {
             flashError('Demasiados intentos fallidos. Espera 15 minutos antes de volver a intentarlo.');
             redir('controller=Auth&action=index');
         }
@@ -55,14 +57,22 @@ class AuthController extends Controller {
 
         // Se verifica siempre la contraseña, aunque el usuario no exista.
         // Si no, el tiempo de respuesta revelaría qué emails existen.
-        $hash = $usuario['password'] ?? '$2y$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinva';
+        // Hash de un texto aleatorio que no se guarda en ningún sitio: sirve
+        // solo para que password_verify() tarde lo mismo que con una
+        // contraseña real. Si el usuario no existe, el tiempo de respuesta
+        // no revela qué emails están registrados.
+        //
+        // ⚠️ Tiene que ser un bcrypt VÁLIDO de 60 caracteres. Con un hash
+        // mal formado, password_verify() vuelve en microsegundos y el
+        // oráculo de temporización vuelve a existir.
+        $hash = $usuario['password'] ?? '$2y$10$b5pz5IIYg3leDdmiAxjLmePzvOSB/93Y977NnpATb5/hHY2uexpB2';
         if (!password_verify($password, $hash) || $usuario === null) {
-            registrarIntentoFallido();
+            LimitadorIntentos::registrarFallido(self::claveDeBloqueo());
             flashError('Credenciales incorrectas');
             redir('controller=Auth&action=index');
         }
 
-        limpiarIntentosFallidos();
+        LimitadorIntentos::limpiar(self::claveDeBloqueo());
 
         // Login exitoso
         session_regenerate_id(true);
@@ -152,6 +162,20 @@ class AuthController extends Controller {
     }
 
     /**
+     * Clave con la que se identifica al que intenta iniciar sesión.
+     *
+     * Se usa la dirección IP. Ojo: si la aplicación se pone detrás de un
+     * proxy o un balanceador, REMOTE_ADDR es la del proxy y el bloqueo
+     * affectaría a todos los usuarios a la vez. En ese caso habría que
+     * usar la cabecera X-Forwarded-For, validada contra una lista blanca.
+     *
+     * @return string
+     */
+    private static function claveDeBloqueo(): string {
+        return (string)($_SERVER['REMOTE_ADDR'] ?? 'desconocida');
+    }
+
+    /**
      * Cierra sesión
      */
     public function logout(): void {
@@ -174,45 +198,4 @@ class AuthController extends Controller {
         session_destroy();
         redir('controller=Auth&action=index');
     }
-}
-
-/**
- * Suma un intento fallido y bloquea la cuenta temporalmente si son muchos.
- *
- * Sin esto, un atacante podía probar miles de contraseñas por segundo.
- *
- * @return void
- */
-function registrarIntentoFallido(): void {
-    $ahora = time();
-    $intentos = $_SESSION['login_fallidos'] ?? [];
-
-    // Se descartan los intentos de hace más de 15 minutos.
-    $intentos = array_filter($intentos, static fn($t) => ($ahora - (int)$t) < 900);
-
-    $intentos[] = $ahora;
-    $_SESSION['login_fallidos'] = $intentos;
-}
-
-/**
- * Indica si la cuenta está bloqueada por intentos fallidos.
- *
- * @return bool
- */
-function loginBloqueado(): bool {
-    $ahora = time();
-    $intentos = array_filter(
-        $_SESSION['login_fallidos'] ?? [],
-        static fn($t) => ($ahora - (int)$t) < 900
-    );
-    return count($intentos) >= 5;
-}
-
-/**
- * Limpia el contador tras un login correcto.
- *
- * @return void
- */
-function limpiarIntentosFallidos(): void {
-    unset($_SESSION['login_fallidos']);
 }
