@@ -654,6 +654,40 @@ Y en **`public/.htaccess`**, la contrapartida que vuelve a permitir el acceso:
 
 ---
 
+## 23. ✅ El bloqueo de intentos no protegía de nada
+
+**Error:** un script podía probar miles de contraseñas por minuto contra `demo@liga.com` y el contador de intentos no lo frenaba.
+
+**Causa:** el contador estaba en `$_SESSION['login_fallidos']`. El atacante simplemente **no envía la cookie de sesión** y cada intento empieza de cero: el bloqueo solo afectaba a un usuario legítimo que se equivocaba cinco veces.
+
+**✅ Solución aplicada:** el contador se guarda en el **servidor**, en un archivo por IP dentro de la carpeta temporal, con la nueva clase `LimitadorIntentos`:
+
+```php
+LimitadorIntentos::estaBloqueado($clave);   // ¿está bloqueada esta IP?
+LimitadorIntentos::registrarFallido($clave); // suma un intento
+LimitadorIntentos::limpiar($clave);          // login correcto: contador a cero
+```
+
+Cada intento fallido se guarda como marca de tiempo; solo cuentan los que caen dentro de la ventana de 15 minutos. El archivo se bloquea con `flock()` para que dos peticiones simultáneas no se pisen, y su nombre es el SHA-256 de la IP para no dejarla a la vista.
+
+**Verificado** con la suite de regresión: tras cinco intentos fallidos, un login **correcto** se rechaza con "Demasiados intentos fallidos"; al limpiar el estado, el login vuelve a funcionar.
+
+### Y de paso: el hash falso tenía que ser un bcrypt de verdad
+
+**Error:** el hash que se usaba cuando el email no existe era una cadena de 67 caracteres que **parecía** un hash pero no lo era.
+
+**Causa:** `password_verify()` necesita un bcrypt válido. Con un hash malformado, PHP puede devolver `false` de inmediato sin hacer el trabajo lento. El caso concreto: la cadena de 67 caracteres sí tardaba 53 ms (PHP leía el prefijo `$2y$10$` y hacía el cálculo completo), pero una cadena más corta del mismo tipo tarda 0,09 ms. La protección de temporización funcionaba **por casualidad**.
+
+**✅ Solución aplicada:** hash bcrypt real de 60 caracteres, generado sobre una cadena aleatoria que no se guarda en ningún sitio. Sirve solo para gastar el mismo tiempo.
+
+| Hash | Longitud | `password_verify` |
+|---|---|---|
+| bcrypt válido | 60 | 53 ms |
+| El que había (malformado) | 67 | 53 ms (por casualidad) |
+| Mismo tipo, cuerpo corto | 12 | **0,09 ms** (oráculo abierto) |
+
+---
+
 ## Resumen de lecciones
 
 | Tema | Lección |
@@ -677,3 +711,5 @@ Y en **`public/.htaccess`**, la contrapartida que vuelve a permitir el acceso:
 | Pruebas | Antes de "arreglar" el código, confirmar que el fallo no sea del test |
 | Despliegue | Lo que cuelgue del `DocumentRoot` es público: el `.htaccess` y el `DocumentRoot` correctos son dos capas, no dos opciones |
 | Servidor | `php -S` no lee `.htaccess`: es para desarrollo, no para servir |
+| Rate limiting | Un contador en la sesión no frena a nadie: el atacante deja de mandar la cookie |
+| Temporización | Un hash "parecido" a un bcrypt puede no serlo: hay que medirlo, no suponerlo |

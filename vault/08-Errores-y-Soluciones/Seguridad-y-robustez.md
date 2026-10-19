@@ -321,26 +321,46 @@ Login sin rate limiting: un script podía probar miles de contraseñas por minut
 
 ### El arreglo
 
+El contador está en el **servidor**, en un archivo por IP dentro de la carpeta temporal, y no en la sesión:
+
 ```php
-function registrarIntentoFallido(): void {
-    $ahora = time();
-    $intentos = $_SESSION['login_fallidos'] ?? [];
-    $intentos = array_filter($intentos, static fn($t) => ($ahora - (int)$t) < 900);
-    $intentos[] = $ahora;
-    $_SESSION['login_fallidos'] = $intentos;
+// app/core/LimitadorIntentos.php
+LimitadorIntentos::estaBloqueado($clave);   // ¿está bloqueada esta IP?
+LimitadorIntentos::registrarFallido($clave); // suma un intento
+LimitadorIntentos::limpiar($clave);          // login correcto: contador a cero
+```
+
+La clave es la dirección IP del visitante:
+
+```php
+private static function claveDeBloqueo(): string {
+    return (string)($_SERVER['REMOTE_ADDR'] ?? 'desconocida');
 }
 ```
 
-Cinco intentos en 15 minutos bloquean el acceso. Los intentos se guardan **en la sesión**, no en la base de datos: protege razonablemente contra el ataque trivial y mantiene el proyecto simple. Contra un atacante de verdad sirve un contador en base de datos o un servicio externo; queda anotado como limitación consciente.
+Cada intento fallido se guarda como una marca de tiempo en un JSON, y se cuentan solo los que caen dentro de la ventana de 15 minutos. El archivo se bloquea con `flock()` para que dos peticiones simultáneas no se pisen, y el nombre del archivo es el hash SHA-256 de la IP, para no dejar la dirección a la vista en el sistema de archivos.
 
-⚠️ **El bloqueo por sesión no frena a quien abre sesión nueva cada cinco intentos.** Es una frenada, no una muralla. Se dice aquí para no dar una sensación de seguridad que no existe.
+⚠️ **El contador NO puede vivir en la sesión.** Un contador en `$_SESSION` no protege de nada: el atacante simplemente no envía la cookie y empieza de cero en cada intento. Es la diferencia entre una frenada que no frena y una que sí.
+
+⚠️ **Si la aplicación se pone detrás de un proxy, `REMOTE_ADDR` es la del proxy** y el bloqueo afectaría a todos los usuarios a la vez. En ese caso habría que usar `X-Forwarded-For`, validada contra una lista blanca de proxies de confianza.
 
 ⚠️ **Se verifica la contraseña aunque el usuario no exista.** Antes se hacía `if ($usuario === null || !password_verify(...))`, con cortocircuito: si el usuario no existía, `password_verify` no se ejecutaba y la respuesta era más rápida. Esa diferencia de tiempo permite enumerar qué emails están registrados. Ahora se verifica siempre contra un hash falso:
 
 ```php
-$hash = $usuario['password'] ?? '$2y$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinva';
+$hash = $usuario['password'] ?? '$2y$10$b5pz5IIYg3leDdmiAxjLmePzvOSB/93Y977NnpATb5/hHY2uexpB2';
 if (!password_verify($password, $hash) || $usuario === null) {
 ```
+
+⚠️ **Ese hash tiene que ser un bcrypt VÁLIDO de 60 caracteres.** La primera versión usaba una cadena de 67 caracteres que parecía un hash pero no lo era. Por casualidad PHP la trataba igual de lento (leía el prefijo `$2y$10$` y hacía el trabajo completo), así que el oráculo de temporización estaba cerrado... pero por accidente. Con un hash mal formado más corto, `password_verify` vuelve en 0,09 ms en vez de 53 ms y el oráculo reaparece. Medido:
+
+| Hash | Longitud | Tiempo de `password_verify` |
+|---|---|---|
+| bcrypt válido | 60 | 53 ms |
+| El que había (malformado) | 67 | 53 ms (por casualidad) |
+| Prefijo con cuerpo corto | 12 | **0,09 ms** (oráculo abierto) |
+| Texto que no es un hash | 13 | 0,22 ms |
+
+Por eso el hash actual es un bcrypt de verdad, generado sobre una cadena aleatoria que no se guarda en ningún sitio: sirve solo para gastar el mismo tiempo.
 
 ---
 

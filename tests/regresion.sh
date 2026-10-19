@@ -53,6 +53,20 @@ contiene() {
   esac
 }
 
+# El bloqueo de intentos de login se guarda en el servidor, en un archivo por
+# IP dentro de la carpeta temporal. La suite lo limpia al empezar y al
+# terminar, para no dejar bloqueada la IP de quien la ejecuta y para que el
+# resultado no dependa de una ejecucion anterior.
+LOCKDIRS="$(/opt/lampp/bin/php -r 'echo sys_get_temp_dir();' 2>/dev/null || echo /tmp)/liga_basquet_login /opt/lampp/temp/liga_basquet_login"
+
+limpiar_bloqueo() {
+  for d in $LOCKDIRS; do
+    rm -f "$d"/*.json 2>/dev/null
+  done
+}
+
+limpiar_bloqueo
+
 # Lee un valor suelto de la base. Lo usan las comprobaciones que necesitan
 # contrastar lo que se guardo con lo que hay realmente en la tabla.
 MYSQL_BIN="${MYSQL_BIN:-/opt/lampp/bin/mysql}"
@@ -264,8 +278,45 @@ noContiene "guardar el mismo nombre -> no error" "No se encontro el equipo"  "$S
 contiene    "el nombre sigue igual"              "$ORIGINAL" "$(mysql_valor 'SELECT nombre FROM equipos WHERE id = 1')"
 
 echo
+echo
 echo "════════════════════════════════════════════════════════════"
-echo "13. Restauracion de la base de datos"
+echo
+echo "════════════════════════════════════════════════════════════"
+echo " 13. Bloqueo de intentos: el contador NO esta en la sesion"
+echo "════════════════════════════════════════════════════════════"
+# El bloqueo es por IP, no por cookie: una sesion nueva no lo reinicia.
+# Por eso el contador vive en el servidor, en un archivo por IP dentro de la
+# carpeta temporal. Al final de la prueba se borra, para no dejar bloqueada
+# la IP de la maquina.
+for i in 1 2 3 4 5; do
+  JAR2="$(mktemp -t ck2.XXXXXX)"
+  T2=$(curl -s -c "$JAR2" -b "$JAR2" "$BASE?controller=Auth&action=index" \
+    | grep -o 'name="csrf_token" value="[a-f0-9]\{64\}"' | head -1 | grep -o '[a-f0-9]\{64\}')
+  curl -s -o /dev/null -X POST -c "$JAR2" -b "$JAR2" "$BASE?controller=Auth&action=login" \
+    -d "csrf_token=$T2&email=demo@liga.com&password=incorrecta"
+  rm -f "$JAR2"
+done
+
+JAR3="$(mktemp -t ck3.XXXXXX)"
+T3=$(curl -s -c "$JAR3" -b "$JAR3" "$BASE?controller=Auth&action=index" \
+  | grep -o 'name="csrf_token" value="[a-f0-9]\{64\}"' | head -1 | grep -o '[a-f0-9]\{64\}')
+R=$(curl -sL -c "$JAR3" -b "$JAR3" -X POST "$BASE?controller=Auth&action=login" \
+  -d "csrf_token=$T3&email=demo@liga.com&password=password")
+contiene "  tras 5 fallos, el login correcto se bloquea" "Demasiados intentos fallidos" "$R"
+noContiene "  y no deja entrar" "Sesión iniciada" "$R"
+rm -f "$JAR3"
+
+# Se limpia el estado para no dejar el contador bloqueado.
+limpiar_bloqueo
+JAR4="$(mktemp -t ck4.XXXXXX)"
+T4=$(curl -s -c "$JAR4" -b "$JAR4" "$BASE?controller=Auth&action=index" \
+  | grep -o 'name="csrf_token" value="[a-f0-9]\{64\}"' | head -1 | grep -o '[a-f0-9]\{64\}')
+R=$(curl -sL -c "$JAR4" -b "$JAR4" -X POST "$BASE?controller=Auth&action=login" \
+  -d "csrf_token=$T4&email=demo@liga.com&password=password")
+contiene "  tras limpiar, el login vuelve a funcionar" "Sesión iniciada" "$R"
+rm -f "$JAR4"
+
+echo "14. Restauracion de la base de datos"
 echo "════════════════════════════════════════════════════════════"
 # La suite crea registros para poder comprobar que se guardan y se listan.
 # Al terminar se reinicia la base desde los scripts de seed, de modo que

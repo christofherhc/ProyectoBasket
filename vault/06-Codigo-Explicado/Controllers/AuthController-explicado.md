@@ -93,21 +93,23 @@ if (empty($email) || empty($password)) {
 ### Paso 4: buscar y verificar
 
 ```php
-require_once '../app/models/Usuario.php';
+require_once __DIR__ . '/../models/Usuario.php';
 $usuarioModel = new Usuario();
 
 $usuario = $usuarioModel->buscarPorEmail($email);
 
-if ($usuario === null || !password_verify($password, $usuario['password'])) {
-    $_SESSION['error'] = 'Credenciales incorrectas';
-    header('Location: ' . BASE_URL . '?controller=Auth&action=index');
-    exit;
+// Hash de un texto aleatorio que no se guarda en ningún sitio: sirve solo
+// para que password_verify() tarde lo mismo que con una contraseña real.
+$hash = $usuario['password'] ?? '$2y$10$b5pz5IIYg3leDdmiAxjLmePzvOSB/93Y977NnpATb5/hHY2uexpB2';
+
+if (!password_verify($password, $hash) || $usuario === null) {
+    LimitadorIntentos::registrarFallido(self::claveDeBloqueo());
+    flashError('Credenciales incorrectas');
+    redir('controller=Auth&action=index');
 }
 ```
 
 **⚠️ El mensaje "Credenciales incorrectas" es el correcto y no un descuido.** Muchos sistemas dicen "usuario no encontrado" o "contraseña incorrecta", lo cual permite a un atacante **descubrir qué emails existen** probando hasta que el mensaje cambie.
-
-**La comparación con `||` (o) es intencionada:** si el usuario no existe, no hay nada que verificar, así que falla. Se podría escribir como dos `if` separados, pero con `||` es una línea y no hay forma de saltarse la verificación.
 
 **`password_verify()` y no `===`.** Esta es la línea más importante del archivo:
 
@@ -117,7 +119,17 @@ password_verify($contraseñaEnTextoPlano, $hashGuardadoEnLaBase)
 
 Compara **la contraseña que escribió el usuario** contra **el hash almacenado**. Devuelve `true` o `false`. Es la única forma correcta: la base nunca tuvo la contraseña real, solo su huella.
 
-**El orden importa.** Primero se busca por email (una consulta), y **después** se verifica la contraseña (una operación de CPU, la parte lenta). Es lo eficiente: si el email no existe, no gastas CPU verificando.
+**⚠️ Se verifica SIEMPRE, aunque el usuario no exista.** Esta es la parte sutil. El orden de la condición es:
+
+```php
+if (!password_verify($password, $hash) || $usuario === null) {
+```
+
+Primero se verifica la contraseña (con el hash real **o con el hash falso** si el usuario no existe) y solo después se comprueba si el usuario era `null`. Si se invirtiera el orden, con `||` y cortocircuito, `password_verify` no se ejecutaría cuando el usuario no existe: la respuesta sería más rápida y esa diferencia de tiempo permite **enumerar qué emails están registrados**.
+
+**⚠️ El hash falso tiene que ser un bcrypt VÁLIDO de 60 caracteres.** Si fuera un texto malformado, `password_verify` volvería en microsegundos y el oráculo de temporización reaparecería por el otro lado. La primera versión del proyecto usaba una cadena de 67 caracteres que parecía un hash: por casualidad PHP la trataba igual de lento, pero era frágil. El hash actual es un bcrypt de verdad, generado sobre una cadena aleatoria que no se guarda en ningún sitio.
+
+**El bloqueo de intentos va aparte.** `LimitadorIntentos` lleva la cuenta de los fallos **en el servidor, por IP**. En la sesión no serviría de nada: el atacante dejaría de mandar la cookie y empezaría de cero en cada intento.
 
 ⚠️ **Lo que NO se hace, y es un error clásico:**
 
@@ -301,6 +313,8 @@ Ese `unset` es lo que hace que el mensaje aparezca **una sola vez**.
 | Validaciones en orden | Se muestra el primer problema, no todos |
 | Logout en 4 pasos | Sesión realmente destruida |
 | Logout por GET | ✅ **Resuelto:** ahora es un formulario POST con token CSRF |
+| Se verifica la contraseña aunque el usuario no exista | Cierra el oráculo de temporización que permite enumerar emails |
+| El bloqueo de intentos se guarda en el servidor, por IP | En la sesión el atacante lo reinicia simplemente dejando de mandar la cookie |
 
 ---
 
