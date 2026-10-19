@@ -170,7 +170,9 @@ $id = enteroPositivo($params['id'] ?? '') ?? 0;
 
 ## 12. Git: Feature Branches + Commits Atómicos
 
-**Decisión:** Flujo con ramas por funcionalidad: `feature/auth`, `feature/equipos`, etc. + commits atómicos descriptivos.
+**Decisión:** Flujo con ramas por funcionalidad + commits atómicos descriptivos.
+
+**Cómo se aplica en este repositorio:** cada bloque de trabajo nace en su propia rama y se integra en `main` con un commit de fusión (`git merge --no-ff`), de modo que el historial muestra qué entró en cada momento. Las ramas que existen son `feature/integridad-equipos`, `fix/seguridad-auth` y `fix/robustez-datos`.
 
 **Justificación:**
 - **Requisito explícito** → Pide feature branches, PRs, avance progresivo

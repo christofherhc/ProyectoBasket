@@ -83,9 +83,26 @@ ProyectoBasket/
 ## Flujo de desarrollo (Git)
 
 - Rama principal: `main`
-- Ramas por funcionalidad: `feature/auth`, `feature/equipos`, `feature/jugadores`, `feature/partidos`, `feature/estadisticas`, `feature/docs`
-- Commits frecuentes, atómicos y descriptivos
-- Avance progresivo (requisito de la práctica)
+- Ramas por funcionalidad, una por bloque de trabajo, que se integran en `main` con un commit de fusión (`--no-ff`) para que quede constancia de qué entró en cada momento:
+  - `feature/integridad-equipos` — el nombre de equipo no puede repetirse
+  - `fix/seguridad-auth` — el bloqueo de intentos de login pasa a ser por IP
+  - `fix/robustez-datos` — ids estrictos, claves foráneas recuperables, escapado unificado
+- Commits frecuentes, atómicos y con mensajes descriptivos (tipo convencional: `feat:`, `fix:`, `docs:`, `test:`)
+- Cada bloque de trabajo lleva sus propias pruebas en `tests/regresion.sh` (95 comprobaciones)
+
+### Publicar en GitHub
+
+El repositorio todavía no tiene remoto. Para publicarlo:
+
+```bash
+git remote add origin https://github.com/TU-USUARIO/ProyectoBasket.git
+git push -u origin main
+git push origin feature/integridad-equipos
+git push origin fix/seguridad-auth
+git push origin fix/robustez-datos
+```
+
+A partir de ahí, cada cambio nuevo sigue el mismo ciclo: rama → commits → pull request → fusión en `main`.
 
 ## Vault de estudio
 
