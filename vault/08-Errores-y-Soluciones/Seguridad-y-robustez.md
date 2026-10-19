@@ -4,7 +4,7 @@
 > revisión completa del código. No es un tutorial de seguridad: es el registro
 > de **qué estaba mal, por qué importaba y qué se hizo** en este proyecto.
 
-**Fecha:** octubre de 2026 · **Alcance:** `app/`, `public/`, `database/schema.sql` · **Pruebas:** `tests/regresion.sh` (96 comprobaciones)
+**Fecha:** octubre de 2026 · **Alcance:** `app/`, `public/`, `database/schema.sql` · **Pruebas:** `tests/regresion.sh` (97 comprobaciones)
 
 ---
 
@@ -464,12 +464,12 @@ Una auditoría también sirve para **descartar** sospechas. Estas se investaron,
 
 ## 12. Cómo se comprueba todo esto
 
-`tests/regresion.sh` ejecuta **96 comprobaciones** contra la aplicación desplegada, agrupadas en 14 bloques:
+`tests/regresion.sh` ejecuta **97 comprobaciones** contra la aplicación desplegada, agrupadas en 14 bloques:
 
 ```bash
 ./tests/regresion.sh
 # ...
-# RESULTADO: 96 correctas, 0 fallidas
+# RESULTADO: 97 correctas, 0 fallidas
 ```
 
 ⚠️ **La suite modifica la base de datos y la reinicia al terminar** desde `database/schema.sql` y `database/seeds.sql`, dejándola en 4/12/4/2. No se ejecuta contra una base con datos reales.
@@ -589,4 +589,4 @@ Nada de lo listado bloquea la entrega, pero conviene saberlo:
 
 ## Archivos relacionados
 
-`../../08-Errores-y-Soluciones/Registro-de-errores.md` (errores 16–25, la historia completa de cada fallo) · `../06-Codigo-Explicado/Core/Router-explicado.md` (lista blanca en detalle) · `../06-Codigo-Explicado/Controllers/EquiposController-explicado.md` (el borrado con FK, paso a paso) · `../06-Codigo-Explicado/Controllers/AuthController-explicado.md` (sesión y bloqueo) · `../04-BD/schema-explicado.md` (las restricciones y por qué se eligieron así) · `../../tests/regresion.sh`
+`../../08-Errores-y-Soluciones/Registro-de-errores.md` (errores 16–26, la historia completa de cada fallo) · `../06-Codigo-Explicado/Core/Router-explicado.md` (lista blanca en detalle) · `../06-Codigo-Explicado/Controllers/EquiposController-explicado.md` (el borrado con FK, paso a paso) · `../06-Codigo-Explicado/Controllers/AuthController-explicado.md` (sesión y bloqueo) · `../04-BD/schema-explicado.md` (las restricciones y por qué se eligieron así) · `../../tests/regresion.sh`

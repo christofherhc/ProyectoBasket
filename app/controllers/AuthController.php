@@ -145,6 +145,14 @@ class AuthController extends Controller {
             redir($volver);
         }
 
+        // bcrypt solo mira los primeros 72 bytes. Sin este aviso, una
+        // contraseña de 100 caracteres se guardaría truncada: cambiar el
+        // final no cambiaría nada y el usuario no lo sabría.
+        if (strlen($password) > MAX_PASSWORD) {
+            flashError('La contraseña no puede superar los ' . MAX_PASSWORD . ' bytes');
+            redir($volver);
+        }
+
         require_once __DIR__ . '/../models/Usuario.php';
         $usuarioModel = new Usuario();
 

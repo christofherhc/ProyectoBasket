@@ -134,6 +134,14 @@ echo " 4. CSRF: los POST sin token se rechazan con 403"
 echo "════════════════════════════════════════════════════════════"
 check "login sin token -> 403" "403" "$(codigo -X POST "$BASE?controller=Auth&action=login" -d 'email=demo@liga.com&password=password')"
 check "registro sin token -> 403" "403" "$(codigo -X POST "$BASE?controller=Auth&action=guardarRegistro" -d 'nombre=X&email=x@x.com&password=PASSword1&confirmar=PASSword1')"
+# bcrypt solo mira los 72 primeros bytes: una contrasena mas larga se
+# truncaria en silencio al guardarla.
+LONG_PASS="$(printf 'a%.0s' $(seq 1 80))"
+JAR4="$(mktemp -t ck4.XXXXXX)"
+TOKEN4=$(curl -s -c "$JAR4" -b "$JAR4" "$BASE?controller=Auth&action=register" \
+  | grep -o 'name="csrf_token" value="[a-f0-9]\{64\}"' | head -1 | grep -o '[a-f0-9]\{64\}')
+contiene "  avisa del limite de 72 bytes" "no puede superar los 72 bytes" "$(curl -sL -c "$JAR4" -b "$JAR4" -X POST "$BASE?controller=Auth&action=guardarRegistro" -d "csrf_token=$TOKEN4&nombre=Largo&email=largo@liga.com&password=$LONG_PASS&confirmar=$LONG_PASS")"
+rm -f "$JAR4"
 check "login con token erroneo -> 403" "403" "$(codigo -X POST "$BASE?controller=Auth&action=login" -d 'email=demo@liga.com&password=password&csrf_token=0000000000000000000000000000000000000000000000000000000000000000')"
 
 echo

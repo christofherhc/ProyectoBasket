@@ -13,13 +13,13 @@
     </div>
 
     <div class="form-group">
-        <label for="password">Contraseña (mín. 6 caracteres)</label>
-        <input type="password" id="password" name="password" required minlength="6">
+        <label for="password">Contraseña (mín. 6, máx. 72 bytes)</label>
+        <input type="password" id="password" name="password" required minlength="6" maxlength="72">
     </div>
 
     <div class="form-group">
         <label for="confirmar">Confirmar contraseña</label>
-        <input type="password" id="confirmar" name="confirmar" required minlength="6">
+        <input type="password" id="confirmar" name="confirmar" required minlength="6" maxlength="72">
     </div>
 
     <button type="submit" class="btn">Registrarse</button>

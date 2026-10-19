@@ -309,7 +309,7 @@ try {
 | Módulos | 5 (auth, equipos, jugadores, partidos, estadísticas) |
 | Archivos PHP | 22 |
 | Tablas | 4, con 3 claves foráneas y un índice `UNIQUE` |
-| Pruebas funcionales | **96 / 96 superadas** |
+| Pruebas funcionales | **97 / 97 superadas** |
 | Seguridad | Prepared statements, bcrypt, escapado de salida, sesiones regeneradas, CSRF, lista blanca `RUTAS`, validación en servidor |
 | Documentación | Vault de 12 secciones, 15 archivos de código explicado, 8 procedimientos |
 | Git | Historial limpio con commits atómicos y mensajes descriptivos |

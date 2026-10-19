@@ -25,6 +25,11 @@ define('MAX_PUNTOS', 999);       // partidos.puntos_local / puntos_visitante
 // no puede guardarlo. El máximo es el año actual y se calcula al validar.
 define('FUNDACION_MIN', 1901);
 
+// Límite de longitud de la contraseña. bcrypt solo tiene en cuenta los
+// primeros 72 bytes: a partir de ahí, cambiar el resto no cambia la
+// contraseña. Se rechaza en el registro en vez de truncar en silencio.
+define('MAX_PASSWORD', 72);
+
 // Posiciones admitidas. La columna es VARCHAR (no ENUM) a propósito,
 // así que la lista blanca vive aquí y se valida en el controlador.
 define('POSICIONES', ['Base', 'Escolta', 'Alero', 'Ala-Pívot', 'Pívot']);

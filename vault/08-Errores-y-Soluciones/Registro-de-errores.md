@@ -764,6 +764,32 @@ fwrite($manejador, (string)json_encode($vivos));
 
 ---
 
+## 26. ✅ bcrypt truncaba la contraseña en silencio a 72 bytes
+
+**Error:** dos contraseñas que solo se diferencian a partir del byte 73 eran **la misma contraseña**.
+
+**Causa:** bcrypt solo tiene en cuenta los **primeros 72 bytes** de la contraseña. Es un límite del algoritmo, no de PHP. Verificado:
+
+```php
+$h = password_hash(str_repeat('A', 72) . 'FINAL-A', PASSWORD_BCRYPT);
+password_verify(str_repeat('A', 72) . 'FINAL-B', $h);  // true
+```
+
+**✅ Solución aplicada:** el registro rechaza las contraseñas que superan el límite, en vez de guardarlas truncadas:
+
+```php
+if (strlen($password) > MAX_PASSWORD) {
+    flashError('La contraseña no puede superar los ' . MAX_PASSWORD . ' bytes');
+    redir($volver);
+}
+```
+
+⚠️ **El límite es en BYTES, no en caracteres.** Una "ñ" ocupa 2 bytes en UTF-8, así que 40 caracteres con tildes ya son 80 bytes. Por eso el mensaje habla de bytes y no de caracteres.
+
+⚠️ **Truncular en silencio es peor que rechazar.** Si no se avisa, el usuario cree que su contraseña de 100 caracteres es la que protege su cuenta, y en realidad solo cuentan los primeros 72 bytes: cambiar el final no cambia nada.
+
+---
+
 ## Resumen de lecciones
 
 | Tema | Lección |
@@ -792,3 +818,4 @@ fwrite($manejador, (string)json_encode($vivos));
 | Validación | Un `(int)` recorta lo que no es número sin avisar: para ids, exige solo dígitos |
 | Rate limiting | Una clave solo por IP bloquea a los demás detrás de un NAT: combina IP y cuenta |
 | Concurrencia | Leer y escribir un contador sin el mismo bloqueo pierde registros: hazlo atómico |
+| Contraseñas | bcrypt solo mira 72 bytes: rechaza lo que exceda, no lo trunques en silencio |
