@@ -357,9 +357,19 @@ $ curl -X POST '...?controller=Jugadores&action=guardar' -d 'nombre=X&posicion=A
 
 Arreglo: `define('POSICIONES', [...])` y comparación con `in_array($posicion, POSICIONES, true)`.
 
-### Dorsales repetidos y `UNIQUE` que no se creaba
+### Dorsales repetidos, nombres de equipo repetidos y `UNIQUE` que no se creaba
 
-Se añadió `UNIQUE (equipo_id, numero)` a `schema.sql`. Pero `CREATE TABLE IF NOT EXISTS` **no modifica una tabla que ya existe**, así que el índice no aparecía en una base creada antes del cambio. Se resolvió con un bloque idempotente:
+Se añadieron dos índices únicos a `schema.sql`: `UNIQUE (equipo_id, numero)` para los dorsales y `UNIQUE (nombre)` para los equipos.
+
+⚠️ **El nombre de equipo repetido no era un detalle menor.** Se podían crear dos equipos llamados "Los Lakers" y en la **tabla de posiciones** aparecían dos filas con el mismo nombre que el usuario no podía distinguir. La ciudad no sirve para desempatar porque esa tabla no la muestra. Ahora el controlador avisa antes de guardar:
+
+```php
+} elseif ($this->equipoModel->existeNombre($nombre, $ignorarId ?? 0)) {
+    $errores[] = 'Ya existe un equipo con ese nombre';
+}
+```
+
+Pero `CREATE TABLE IF NOT EXISTS` **no modifica una tabla que ya existe**, así que los índices no aparecían en una base creada antes del cambio. Se resolvió con un bloque idempotente:
 
 ```sql
 SET @indice_ya_existe = (
@@ -373,6 +383,8 @@ SET @sql_indice = IF(
   'ALTER TABLE jugadores ADD UNIQUE KEY uq_jugador_camiseta (equipo_id, numero)',
   'DO 0'
 );
+-- el mismo patrón, con su propia comprobación de duplicados, para
+-- uq_equipo_nombre sobre la tabla equipos
 PREPARE stmt_indice FROM @sql_indice;
 EXECUTE stmt_indice;
 DEALLOCATE PREPARE stmt_indice;
@@ -547,7 +559,6 @@ Nada de lo listado bloquea la entrega, pero conviene saberlo:
 | **Límite de intentos en base de datos** | El contador está en la sesión; un atacante serio abre sesión nueva cada vez |
 | **Registro de auditoría** | No hay tabla que registre "quién borró qué". Recomendable en cualquier CRUD real |
 | **Paginación** | No hay `LIMIT` en los listados. Con muchos registros la aplicación se ralentiza |
-| **Nombre único de equipo** | Decisión consciente: dos equipos pueden llamarse igual en ciudades distintas |
 
 ---
 

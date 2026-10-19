@@ -62,4 +62,25 @@ class Equipo extends Model {
         $stmt->execute();
         return $stmt->fetchAll();
     }
+
+    /**
+     * Indica si ya existe un equipo con ese nombre.
+     *
+     * El índice UNIQUE (nombre) lo impide de todos modos, pero comprobarlo
+     * antes permite dar un mensaje claro en el formulario en vez del error
+     * 1062 genérico "Ya existe un registro con esos datos".
+     *
+     * @param string $nombre
+     * @param int    $ignorarId Al editar, el propio equipo no debe contar.
+     * @return bool
+     */
+    public function existeNombre(string $nombre, int $ignorarId = 0): bool {
+        $sql = "SELECT COUNT(*) FROM {$this->tabla}
+                WHERE nombre = :nombre AND id <> :ignorar";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':nombre', $nombre, PDO::PARAM_STR);
+        $stmt->bindValue(':ignorar', $ignorarId, PDO::PARAM_INT);
+        $stmt->execute();
+        return (int)$stmt->fetchColumn() > 0;
+    }
 }

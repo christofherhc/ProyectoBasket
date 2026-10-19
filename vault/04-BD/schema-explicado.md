@@ -54,11 +54,14 @@ CREATE TABLE IF NOT EXISTS equipos (
   nombre VARCHAR(100) NOT NULL COMMENT 'Nombre del equipo',
   ciudad VARCHAR(100) NOT NULL COMMENT 'Ciudad de origen',
   fundacion YEAR NULL COMMENT 'Año de fundación (opcional)',
-  creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+  creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_equipo_nombre (nombre)
 ) ENGINE=InnoDB ...;
 ```
 
 `fundacion YEAR NULL` es opcional a propósito: hay equipos sin año de fundación conocido. `NULL` significa "no lo sé", que es distinto de `0` (que significaría "fundado en el año 0"). Esta distinción se respeta también en PHP (ver `Equipo-explicado.md`).
+
+`UNIQUE KEY uq_equipo_nombre (nombre)` impide que dos equipos se llamen igual. Antes no lo había y el resultado era visible: en la tabla de posiciones aparecían dos filas con el mismo nombre que el usuario no podía distinguir. La ciudad no sirve para desempatar porque la tabla de posiciones no la muestra.
 
 ## 5. Tabla `jugadores` — donde aparece la primera clave foránea
 
@@ -182,13 +185,13 @@ La versión final (secciones 2, 5 y 6) usa `KEY` dentro del `CREATE TABLE`, `CRE
 
 **Lección general:** cuando un script de base de datos no es idempotente, la causa casi siempre es un elemento declarado fuera de su bloque (índices, constraints, triggers).
 
-## 9-bis. ⚠️ El índice único de dorsales y las bases que ya existían
+## 9-bis. ⚠️ Los índices únicos y las bases que ya existían
 
-Después de la auditoría se añadió `UNIQUE KEY uq_jugador_camiseta (equipo_id, numero)` para que un dorsal no se repita dentro del mismo equipo. Aquí está el problema que dejaba la solución a medias.
+Después de la auditoría se añadieron dos índices únicos: `uq_jugador_camiseta (equipo_id, numero)`, para que un dorsal no se repita dentro del mismo equipo, y `uq_equipo_nombre (nombre)`, para que dos equipos no se llamen igual. Aquí está el problema que dejaba la solución a medias.
 
 ⚠️ **`CREATE TABLE IF NOT EXISTS` no actualiza una tabla que ya existe.** Su nombre lo dice: "crea la tabla si no hay ninguna". Si el usuario ya tenía la base creada con una versión anterior del script, la tabla `jugadores` ya estaba y **el `CREATE TABLE` se saltaba entero**: el índice inline nunca se creaba, y el usuario que creyera que la restricción estaba activa seguía pudiendo meter dorsales repetidos sin enterarse.
 
-Por eso el final de `schema.sql` tiene un bloque aparte que consulta `information_schema` y añade el índice con `ALTER TABLE` si falta.
+Por eso el final de `schema.sql` tiene un bloque aparte que consulta `information_schema` y añade cada índice con `ALTER TABLE` si falta. Los dos índices siguen el mismo patrón: dorsal por equipo y nombre de equipo.
 
 ### ⚠️ Y el `ALTER` también puede fallar
 
@@ -240,13 +243,27 @@ que en la base de prueba produce exactamente esto:
 
 ⚠️ **`WHERE numero IS NOT NULL` es obligatorio.** El dorsal es opcional, así que hay jugadores con `NULL`. En un `UNIQUE`, varios `NULL` en la misma columna **no** se consideran duplicados, así que se pueden insertar sin problema (se comprobó: dos jugadores sin dorsal en el mismo equipo conviven). Si el filtro no estuviera, el `GROUP BY` contaría los `NULL` como repetidos y saltaría el índice sin motivo.
 
-⚠️ **La migración se probó en los tres escenarios,** no solo en el fácil:
+⚠️ **La migración se probó en los tres escenarios,** no solo en el fácil (y con los dos índices a la vez):
 
 | Base de partida | Índice creado | Import |
 |---|---|---|
 | Vacía (esquema nuevo) | Inline en el `CREATE TABLE` | Sin errores |
 | Antigua **sin** duplicados | Sí, con el `ALTER` | Sin errores |
 | Antigua **con** duplicados | No, se omite y avisa | **Sin errores**, exit 0 |
+
+⚠️ **Con duplicados en las dos tablas a la vez**, la importación sigue terminando bien y avisa de cada problema por separado:
+
+```
+AVISO: no se creó el índice único uq_jugador_camiseta porque hay dorsales repetidos dentro de un mismo equipo.
+equipo_id  numero  repetidos  ids_afectados
+1          5       2          1,2
+
+AVISO: no se creó el índice único uq_equipo_nombre porque hay equipos con el mismo nombre.
+nombre       repetidos  ids_afectados
+Los Lakers  2          1,2
+```
+
+⚠️ **El mensaje de cada tabla dice qué fila sobra.** Con el nombre del equipo duplicado, el usuario sabe exactamente qué dos equipos elegir entre ellos; con el dorsal, qué dos jugadores.
 
 ⚠️ **El último caso es el importante.** Un esquema que se importa bien es mejor que uno que se importa "hasta donde da error".
 

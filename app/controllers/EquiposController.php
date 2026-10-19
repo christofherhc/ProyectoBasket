@@ -69,7 +69,7 @@ class EquiposController extends Controller {
         exigirPost('controller=Equipos&action=index');
 
         $id = (int)post('id');
-        [$nombre, $ciudad, $fundacionInt, $errores] = $this->validarCampos();
+        [$nombre, $ciudad, $fundacionInt, $errores] = $this->validarCampos($id);
 
         if ($errores === []) {
             $errores = $this->validarId($id, 'equipo');
@@ -129,9 +129,11 @@ class EquiposController extends Controller {
     /**
      * Valida los campos del formulario de equipo.
      *
+     * @param int|null $ignorarId Al editar, el id del propio equipo (para no
+     *                            marcarlo como nombre duplicado de sí mismo).
      * @return array [nombre, ciudad, fundacion, errores]
      */
-    private function validarCampos(): array {
+    private function validarCampos(?int $ignorarId = null): array {
         $nombre    = trim(post('nombre'));
         $ciudad    = trim(post('ciudad'));
         $fundacion = trim(post('fundacion'));
@@ -149,6 +151,11 @@ class EquiposController extends Controller {
             $errores[] = 'El nombre es obligatorio';
         } elseif (!cabeEnColumna($nombre, MAX_NOMBRE)) {
             $errores[] = 'El nombre no puede superar los ' . MAX_NOMBRE . ' caracteres';
+        } elseif ($this->equipoModel->existeNombre($nombre, $ignorarId ?? 0)) {
+            // Dos equipos con el mismo nombre son indistinguibles en la tabla
+            // de posiciones. El índice UNIQUE lo bloquea igualmente, pero así
+            // el mensaje apunta al campo en vez de ser un error genérico.
+            $errores[] = 'Ya existe un equipo con ese nombre';
         }
 
         if ($ciudad === '') {
