@@ -74,6 +74,76 @@ mysql_valor() {
   "$MYSQL_BIN" -u root -N -B liga_basquet -e "$1" 2>/dev/null | head -1
 }
 
+# =============================================
+# Comprobación previa: sin esto, si falta la base de datos la suite falla
+# en casi todo y el mensaje no dice cuál es el problema real.
+# =============================================
+preflight() {
+  echo "════════════════════════════════════════════════════════════"
+  echo " 0. Comprobaciones previas"
+  echo "════════════════════════════════════════════════════════════"
+
+  if ! command -v "$MYSQL_BIN" >/dev/null 2>&1; then
+    printf '  ERROR %-54s no se encuentra el cliente MySQL (%s)\n' "el cliente mysql" "$MYSQL_BIN"
+    return 1
+  fi
+
+  if ! "$MYSQL_BIN" -u root -N -B -e "SELECT 1" >/dev/null 2>&1; then
+    printf '  ERROR %-54s no se puede conectar a MySQL como root\n' "conexion a MySQL"
+    return 1
+  fi
+
+  if [ "$("$MYSQL_BIN" -u root -N -B -e \
+        "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='liga_basquet'" \
+        2>/dev/null | head -1)" != "1" ]; then
+    printf '  ERROR %-54s la base de datos liga_basquet no existe\n' "base de datos"
+    echo
+    echo "  Crea la base de datos importando el esquema. Ojo: el comando va"
+    echo "  SIN el nombre de la base, porque schema.sql ya hace el CREATE"
+    echo "  DATABASE y el USE por dentro:"
+    echo
+    echo "      mysql -u root < database/schema.sql"
+    echo "      mysql -u root < database/seeds.sql   # datos de prueba (opcional)"
+    echo
+    echo "  Si la base ya existe pero le faltan tablas, vuelve a importar el esquema."
+    return 1
+  fi
+
+  TABLAS=$("$MYSQL_BIN" -u root -N -B -e \
+    "SELECT COUNT(*) FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA='liga_basquet'
+        AND TABLE_NAME IN ('usuarios','equipos','jugadores','partidos')" 2>/dev/null | head -1)
+  if [ "$TABLAS" != "4" ]; then
+    printf '  ERROR %-54s faltan tablas (hay %s de 4)\n' "tablas del esquema" "${TABLAS:-0}"
+    echo
+    echo "      mysql -u root < database/schema.sql"
+    return 1
+  fi
+
+  CODIGO=$(codigo "$BASE?controller=Auth&action=index")
+  if [ "$CODIGO" = "000" ] || [ "$CODIGO" = "500" ]; then
+    printf '  ERROR %-54s la aplicacion no responde (HTTP %s)\n' "la aplicacion" "$CODIGO"
+    echo
+    echo "  Comprueba que Apache está arrancado y que la URL es correcta:"
+    echo "      $BASE"
+    return 1
+  fi
+
+  printf '  OK    %-56s %s\n' "MySQL accesible, base de datos y tablas presentes" "4 tablas"
+  printf '  OK    %-56s %s\n' "la aplicacion responde" "HTTP $CODIGO"
+  echo
+  return 0
+}
+
+if ! preflight; then
+  echo
+  echo "════════════════════════════════════════════════════════════"
+  echo " La suite no puede continuar sin la base de datos y la aplicacion."
+  echo "════════════════════════════════════════════════════════════"
+  rm -f "$JAR"
+  exit 1
+fi
+
 noContiene() {
   case "$3" in
     *"$2"*) printf '  FALLA %-56s presente (no deberia): %s\n' "$1" "$2"; FAIL=$((FAIL + 1)) ;;
@@ -376,8 +446,12 @@ if command -v "$MYSQL_BIN" >/dev/null 2>&1; then
   # seeds.sql usa INSERT IGNORE con IDs fijos: solo rellena lo que falta, no
   # borra. Se vacian las tablas (en orden de clave foranea) y luego se importa.
   "$MYSQL_BIN" -u root liga_basquet -e "SET FOREIGN_KEY_CHECKS=0; TRUNCATE TABLE partidos; TRUNCATE TABLE jugadores; TRUNCATE TABLE equipos; TRUNCATE TABLE usuarios; SET FOREIGN_KEY_CHECKS=1;" 2>/dev/null
-  "$MYSQL_BIN" -u root liga_basquet < "$RAIZ/database/schema.sql" 2>/dev/null
-  "$MYSQL_BIN" -u root liga_basquet < "$RAIZ/database/seeds.sql"  2>/dev/null
+  # El import va SIN el nombre de la base a proposito: schema.sql hace el
+  # CREATE DATABASE y el USE por dentro. Si se le pone el nombre y la base
+  # no existe, el cliente falla con "Unknown database" antes de leer el
+  # script, y la restauracion se queda a medias.
+  "$MYSQL_BIN" -u root < "$RAIZ/database/schema.sql" 2>/dev/null
+  "$MYSQL_BIN" -u root < "$RAIZ/database/seeds.sql"  2>/dev/null
   R=$("$MYSQL_BIN" -N -B -u root liga_basquet -e \
        "SELECT CONCAT((SELECT COUNT(*) FROM equipos),'/',(SELECT COUNT(*) FROM jugadores),'/',(SELECT COUNT(*) FROM partidos),'/',(SELECT COUNT(*) FROM usuarios));" 2>/dev/null)
   if [ "$R" = "4/12/4/2" ]; then

@@ -24,7 +24,7 @@ ProyectoBasket/
 ├── .htaccess                    # Bloquea el acceso a todo el proyecto salvo public/
 ├── app/
 │   ├── config/config.php        # Configuración de BD y rutas
-│   ├── core/                    # Clases base (Database, Model, Controller, Router)
+│   ├── core/                    # Clases base (Database, Model, Controller, Router, LimitadorIntentos) y helpers
 │   ├── models/                  # Modelos (Usuario, Equipo, Jugador, Partido)
 │   ├── controllers/             # Controladores (Auth, Equipos, Jugadores, Partidos, Estadisticas)
 │   └── views/                   # Vistas con layout base

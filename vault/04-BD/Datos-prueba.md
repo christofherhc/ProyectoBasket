@@ -200,7 +200,11 @@ LIMIT 5;"
 
 ## 10. Advertencia
 
-Estos datos son **solo para desarrollo y pruebas**. Las contraseñas son públicas (`password`). Nunca subas un seeds.sql con claves reales a un repositorio: usa un `.gitignore` o un archivo aparte para producción.
+Estos datos son **solo para desarrollo y pruebas**. Las contraseñas son públicas (`password`). Nunca subes un seeds.sql con claves reales a un repositorio: usa un `.gitignore` o un archivo aparte para producción.
+
+⚠️ **El hash de `password` es uno de los más conocidos que hay.** Aparece en miles de repositorios y en todas las listas de contraseñas descartadas, así que no hace falta ni descifrarlo: se reconoce al momento. Cualquiera que tenga el repositorio puede entrar como `demo@liga.com` o `admin@liga.com`.
+
+Por eso la aplicación **no debe exponerse a Internet** con estos datos de prueba. Si algún día se publica, lo primero es cambiar las contraseñas de los usuarios de prueba y poner una contraseña propia, larga, a los que se registran.
 
 ---
 

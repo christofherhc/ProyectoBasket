@@ -10,7 +10,7 @@ El sistema implementa una arquitectura **MVC ligero** en PHP vanilla, sin framew
 
 ## 2. Componentes Clave
 
-`Database.php` implementa el patrón *singleton* sobre PDO con `ERRMODE_EXCEPTION`, `FETCH_ASSOC` y `utf8mb4`. `Model.php` aporta `obtenerTodos()`, `obtenerPorId()`, `eliminar()` y `obtenerUltimoId()`; cada modelo concreto añade sus propios `crear()` y `actualizar()`. `Controller.php` resuelve la vista con `extract()` y el layout, e implementa `requiereLogin()`. `helpers.php` centraliza funciones sin clase: escapado, tokens CSRF, mensajes flash, redirecciones y validación. Los modelos `Usuario`, `Equipo`, `Jugador` y `Partido` heredan de `Model`; los controladores `AuthController`, `EquiposController`, `JugadoresController`, `PartidosController` y `EstadisticasController` coordinan los cinco módulos exigidos.
+`Database.php` implementa el patrón *singleton* sobre PDO con `ERRMODE_EXCEPTION`, `FETCH_ASSOC` y `utf8mb4`. `Model.php` aporta `obtenerTodos()`, `obtenerPorId()`, `eliminar()` y `obtenerUltimoId()`; cada modelo concreto añade sus propios `crear()` y `actualizar()`. `Controller.php` resuelve la vista con `extract()` y el layout, e implementa `requiereLogin()`. `helpers.php` centraliza funciones sin clase: escapado, tokens CSRF, mensajes flash, redirecciones y validación. `LimitadorIntentos.php` cuenta los intentos de login fallidos en el servidor, por IP y cuenta, para frenar la fuerza bruta. Los modelos `Usuario`, `Equipo`, `Jugador` y `Partido` heredan de `Model`; los controladores `AuthController`, `EquiposController`, `JugadoresController`, `PartidosController` y `EstadisticasController` coordinan los cinco módulos exigidos.
 
 ## 3. Funcionalidades Desarrolladas
 

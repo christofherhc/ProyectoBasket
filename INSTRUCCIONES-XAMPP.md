@@ -20,10 +20,25 @@ Inicia **Apache** y **MySQL** desde el XAMPP Control Panel.
 
 El archivo `database/schema.sql` **ya crea la base de datos** `liga_basquet` y todas las tablas.
 
+**Opción A — phpMyAdmin (gráfica):**
+
 1. Ir a `http://localhost/phpmyadmin`
 2. Pestaña **Importar** (sin seleccionar ninguna BD)
 3. Seleccionar `database/schema.sql` → **Ejecutar**
    - (Opcional) Luego importar `database/seeds.sql` para datos de prueba
+
+**Opción B — consola (más rápida):**
+
+```bash
+mysql -u root < database/schema.sql
+mysql -u root < database/seeds.sql   # datos de prueba (opcional)
+```
+
+⚠️ **El comando va SIN el nombre de la base de datos.** `schema.sql` ya hace
+el `CREATE DATABASE` y el `USE` por dentro. Si se escribe
+`mysql -u root liga_basquet < database/schema.sql` y la base todavía no
+existe, el cliente falla con `ERROR 1049: Unknown database 'liga_basquet'`
+**antes de leer el script**, y no se crea nada.
 
 > Seguro de reimportar: no da error si ya existe.
 
