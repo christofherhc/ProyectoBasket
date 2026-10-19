@@ -201,6 +201,12 @@ contiene "  avisa de la fecha invalida" "fecha indicada no es válida" "$(POSTL 
 check "puntos fuera de rango -> 302" "302" "$(POST "controller=Partidos&action=guardar" "csrf_token=$TOKEN&equipo_local_id=1&equipo_visitante_id=2&puntos_local=5000&puntos_visitante=2&fecha=2026-10-12T19:00")"
 contiene "  avisa del limite de puntos" "no pueden superar" "$(POSTL "controller=Partidos&action=guardar" "csrf_token=$TOKEN&equipo_local_id=1&equipo_visitante_id=2&puntos_local=5000&puntos_visitante=2&fecha=2026-10-12T19:00")"
 check "puntos no numericos -> 302" "302" "$(POST "controller=Partidos&action=guardar" "csrf_token=$TOKEN&equipo_local_id=1&equipo_visitante_id=2&puntos_local=abc&puntos_visitante=2&fecha=2026-10-12T19:00")"
+# Si el campo no viene, el marcador se avisa como obligatorio: antes el
+# valor por defecto era '0' y se guardaba un 0-0 sin avisar.
+contiene "  avisa de los puntos obligatorios" "son obligatorios" "$(POSTL "controller=Partidos&action=guardar" "csrf_token=$TOKEN&equipo_local_id=1&equipo_visitante_id=2&fecha=2026-10-12T19:00")"
+# Un id con basura no es un id: (int)'1abc' valía 1 y cargaba el registro 1.
+check "id con basura no carga el registro 1" "302" "$(codigo -b "$JAR" "$BASE?controller=Equipos&action=editar&id=1abc")"
+contiene "  y avisa que no existe" "Equipo no encontrado" "$(cuerpo -b "$JAR" -L "$BASE?controller=Equipos&action=editar&id=1abc")"
 check "equipo local = visitante -> 302" "302" "$(POST "controller=Partidos&action=guardar" "csrf_token=$TOKEN&equipo_local_id=1&equipo_visitante_id=1&puntos_local=1&puntos_visitante=2&fecha=2026-10-12T19:00")"
 check "equipos inexistentes -> 302" "302" "$(POST "controller=Partidos&action=guardar" "csrf_token=$TOKEN&equipo_local_id=9998&equipo_visitante_id=9999&puntos_local=1&puntos_visitante=2&fecha=2026-10-12T19:00")"
 

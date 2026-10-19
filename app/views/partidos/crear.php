@@ -8,7 +8,7 @@
             <option value="">-- Seleccionar --</option>
             <?php foreach ($equipos as $e): ?>
                 <option value="<?= $e['id'] ?>" <?= isset($old['equipo_local_id']) && (int)$old['equipo_local_id']===(int)$e['id']?'selected':'' ?>>
-                    <?= htmlspecialchars($e['nombre']) ?>
+                    <?= e($e['nombre']) ?>
                 </option>
             <?php endforeach; ?>
         </select>
@@ -20,7 +20,7 @@
             <option value="">-- Seleccionar --</option>
             <?php foreach ($equipos as $e): ?>
                 <option value="<?= $e['id'] ?>" <?= isset($old['equipo_visitante_id']) && (int)$old['equipo_visitante_id']===(int)$e['id']?'selected':'' ?>>
-                    <?= htmlspecialchars($e['nombre']) ?>
+                    <?= e($e['nombre']) ?>
                 </option>
             <?php endforeach; ?>
         </select>
@@ -28,17 +28,17 @@
 
     <div class="form-group">
         <label for="puntos_local">Puntos Local *</label>
-        <input type="number" id="puntos_local" name="puntos_local" min="0" value="<?= htmlspecialchars((string)($old['puntos_local'] ?? 0)) ?>" required>
+        <input type="number" id="puntos_local" name="puntos_local" min="0" max="<?= MAX_PUNTOS ?>" value="<?= e(($old['puntos_local'] ?? 0)) ?>" required>
     </div>
 
     <div class="form-group">
         <label for="puntos_visitante">Puntos Visitante *</label>
-        <input type="number" id="puntos_visitante" name="puntos_visitante" min="0" value="<?= htmlspecialchars((string)($old['puntos_visitante'] ?? 0)) ?>" required>
+        <input type="number" id="puntos_visitante" name="puntos_visitante" min="0" max="<?= MAX_PUNTOS ?>" value="<?= e(($old['puntos_visitante'] ?? 0)) ?>" required>
     </div>
 
     <div class="form-group">
         <label for="fecha">Fecha y Hora *</label>
-        <input type="datetime-local" id="fecha" name="fecha" value="<?= htmlspecialchars(str_replace(' ', 'T', substr($old['fecha'] ?? '', 0, 16))) ?>" required>
+        <input type="datetime-local" id="fecha" name="fecha" value="<?= e(str_replace(' ', 'T', substr($old['fecha'] ?? '', 0, 16))) ?>" required>
     </div>
 
     <button type="submit" class="btn">Registrar</button>

@@ -60,7 +60,7 @@ class JugadoresController extends Controller {
 
     public function editar(array $params): void {
         $this->requiereLogin();
-        $id = (int)($params['id'] ?? 0);
+        $id = enteroPositivo($params['id'] ?? '') ?? 0;
         $jugador = $this->jugadorModel->obtenerPorId($id);
         if ($jugador === null) {
             flashError('Jugador no encontrado');
@@ -81,7 +81,7 @@ class JugadoresController extends Controller {
         $this->requiereLogin();
         exigirPost('controller=Jugadores&action=index');
 
-        $id = (int)post('id');
+        $id = enteroPositivo(post('id')) ?? 0;
         [$datos, $errores] = $this->validarCampos($id);
 
         if ($errores === []) {
@@ -120,7 +120,7 @@ class JugadoresController extends Controller {
         $this->requiereLogin();
         exigirPost('controller=Jugadores&action=index');
 
-        $id = (int)post('id');
+        $id = enteroPositivo(post('id')) ?? 0;
 
         if ($id <= 0) {
             flashError('ID de jugador inválido');

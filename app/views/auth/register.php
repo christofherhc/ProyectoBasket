@@ -4,12 +4,12 @@
     <?= csrfCampo() ?>
     <div class="form-group">
         <label for="nombre">Nombre completo</label>
-        <input type="text" id="nombre" name="nombre" value="<?= isset($old['nombre']) ? htmlspecialchars($old['nombre']) : '' ?>" required>
+        <input type="text" id="nombre" name="nombre" value="<?= isset($old['nombre']) ? e($old['nombre']) : '' ?>" required>
     </div>
 
     <div class="form-group">
         <label for="email">Email</label>
-        <input type="email" id="email" name="email" value="<?= isset($old['email']) ? htmlspecialchars($old['email']) : '' ?>" required>
+        <input type="email" id="email" name="email" value="<?= isset($old['email']) ? e($old['email']) : '' ?>" required>
     </div>
 
     <div class="form-group">

@@ -23,7 +23,7 @@
             <?php foreach ($stats as $i => $s): ?>
                 <tr>
                     <td><?= $i + 1 ?></td>
-                    <td><?= htmlspecialchars($s['nombre']) ?></td>
+                    <td><?= e($s['nombre']) ?></td>
                     <td><?= $s['pj'] ?></td>
                     <td><?= $s['pg'] ?></td>
                     <td><?= $s['pe'] ?></td>
@@ -59,9 +59,9 @@
                     if ($pl>$pv) $r='Gana Local'; elseif($pv>$pl) $r='Gana Visitante'; else $r='Empate';
                 ?>
                 <tr>
-                    <td><?= htmlspecialchars($p['fecha']) ?></td>
-                    <td><?= htmlspecialchars($p['nombre_local']) ?></td>
-                    <td><?= htmlspecialchars($p['nombre_visitante']) ?></td>
+                    <td><?= e($p['fecha']) ?></td>
+                    <td><?= e($p['nombre_local']) ?></td>
+                    <td><?= e($p['nombre_visitante']) ?></td>
                     <td><?= $pl ?> - <?= $pv ?></td>
                     <td><?= $r ?></td>
                 </tr>

@@ -20,8 +20,11 @@ class Controller {
             extract($datos, EXTR_SKIP);
         }
 
-        // Cargar layout principal (contiene header, nav, footer)
-        require_once __DIR__ . '/../views/layouts/main.php';
+        // Cargar layout principal (contiene header, nav, footer).
+        // require y no require_once: cada llamada a view() debe renderizar.
+        // Con require_once, una segunda llamada en la misma petición no
+        // mostraría nada en absoluto.
+        require __DIR__ . '/../views/layouts/main.php';
     }
 
     /**

@@ -4,12 +4,12 @@
     <?= csrfCampo() ?>
     <div class="form-group">
         <label for="nombre">Nombre *</label>
-        <input type="text" id="nombre" name="nombre" value="<?= isset($old['nombre']) ? htmlspecialchars($old['nombre']) : '' ?>" required>
+        <input type="text" id="nombre" name="nombre" value="<?= isset($old['nombre']) ? e($old['nombre']) : '' ?>" required>
     </div>
 
     <div class="form-group">
         <label for="numero">Número de camiseta</label>
-        <input type="number" id="numero" name="numero" min="0" max="99" value="<?= isset($old['numero']) && $old['numero'] !== '' ? htmlspecialchars((string)$old['numero']) : '' ?>">
+        <input type="number" id="numero" name="numero" min="0" max="99" value="<?= isset($old['numero']) && $old['numero'] !== '' ? e($old['numero']) : '' ?>">
     </div>
 
     <div class="form-group">
@@ -30,7 +30,7 @@
             <option value="">-- Seleccionar equipo --</option>
             <?php foreach ($equipos as $equipo): ?>
                 <option value="<?= $equipo['id'] ?>" <?= isset($old['equipo_id']) && (int)$old['equipo_id'] === (int)$equipo['id'] ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($equipo['nombre']) ?> (<?= htmlspecialchars($equipo['ciudad']) ?>)
+                    <?= e($equipo['nombre']) ?> (<?= e($equipo['ciudad']) ?>)
                 </option>
             <?php endforeach; ?>
         </select>

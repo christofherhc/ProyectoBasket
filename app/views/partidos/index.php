@@ -33,10 +33,10 @@
                     }
                 ?>
                 <tr>
-                    <td><?= htmlspecialchars((string)$p['id']) ?></td>
-                    <td><?= htmlspecialchars($p['fecha']) ?></td>
-                    <td><?= htmlspecialchars($p['nombre_local']) ?></td>
-                    <td><?= htmlspecialchars($p['nombre_visitante']) ?></td>
+                    <td><?= e($p['id']) ?></td>
+                    <td><?= e($p['fecha']) ?></td>
+                    <td><?= e($p['nombre_local']) ?></td>
+                    <td><?= e($p['nombre_visitante']) ?></td>
                     <td><?= $pl ?> - <?= $pv ?></td>
                     <td><?= $res ?></td>
                     <td>

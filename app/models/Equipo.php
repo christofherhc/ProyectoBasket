@@ -15,7 +15,10 @@ class Equipo extends Model {
         $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':nombre', $nombre, PDO::PARAM_STR);
         $stmt->bindValue(':ciudad', $ciudad, PDO::PARAM_STR);
-        if ($fundacion === null || $fundacion === 0) {
+        // null significa "sin año de fundación". El 0 no se trata aparte:
+        // YEAR no guarda el año 0, y el controlador ya rechaza cualquier
+        // año anterior a FUNDACION_MIN.
+        if ($fundacion === null) {
             $stmt->bindValue(':fundacion', null, PDO::PARAM_NULL);
         } else {
             $stmt->bindValue(':fundacion', $fundacion, PDO::PARAM_INT);
@@ -34,7 +37,10 @@ class Equipo extends Model {
         $stmt->bindValue(':nombre', $nombre, PDO::PARAM_STR);
         $stmt->bindValue(':ciudad', $ciudad, PDO::PARAM_STR);
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
-        if ($fundacion === null || $fundacion === 0) {
+        // null significa "sin año de fundación". El 0 no se trata aparte:
+        // YEAR no guarda el año 0, y el controlador ya rechaza cualquier
+        // año anterior a FUNDACION_MIN.
+        if ($fundacion === null) {
             $stmt->bindValue(':fundacion', null, PDO::PARAM_NULL);
         } else {
             $stmt->bindValue(':fundacion', $fundacion, PDO::PARAM_INT);

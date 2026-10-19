@@ -175,3 +175,136 @@ SELECT nombre, COUNT(*) AS repetidos, GROUP_CONCAT(id ORDER BY id) AS ids_afecta
   FROM equipos
  GROUP BY nombre
 HAVING COUNT(*) > 1;
+
+-- --- Claves foráneas de las tablas hijas ---
+-- Las FKs son lo que impide borrar un equipo que tiene jugadores o
+-- partidos. Si una base se creó con una versión anterior del esquema,
+-- CREATE TABLE IF NOT EXISTS no las añade: quedaría una base sin
+-- integridad referencial, que es justo el fallo que documenta el
+-- registro de errores (#16).
+--
+-- Antes de añadir cada FK se comprueba que no queden filas huérfanas: si
+-- las hay, la FK no se crea (fallaría con el error 1452) y se avisa, en
+-- lugar de abortar la importación.
+--
+-- La comprobación de existence usa information_schema.REFERENTIAL_CONSTRAINTS.
+
+-- 1) jugadores.equipo_id -> equipos.id
+SET @fk_ya_existe = (
+  SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME       = 'jugadores'
+    AND CONSTRAINT_NAME  = 'fk_jugador_equipo'
+);
+
+SET @hay_huerfanos = (
+  SELECT COUNT(*) FROM jugadores j
+   LEFT JOIN equipos e ON e.id = j.equipo_id
+   WHERE e.id IS NULL
+);
+
+SET @sql_fk = IF(
+  @fk_ya_existe > 0,
+  'DO 0',
+  IF(
+    @hay_huerfanos > 0,
+    'DO 0',
+    'ALTER TABLE jugadores ADD CONSTRAINT fk_jugador_equipo FOREIGN KEY (equipo_id) REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE'
+  )
+);
+
+PREPARE stmt_fk FROM @sql_fk;
+EXECUTE stmt_fk;
+DEALLOCATE PREPARE stmt_fk;
+
+SELECT IF(
+  @fk_ya_existe > 0,
+  'fk_jugador_equipo verificada.',
+  IF(
+    @hay_huerfanos > 0,
+    'AVISO: no se creó la clave foránea fk_jugador_equipo porque hay jugadores sin equipo.',
+    'fk_jugador_equipo verificada.'
+  )
+) AS estado_migracion;
+
+-- 2) partidos.equipo_local_id -> equipos.id
+SET @fk_ya_existe = (
+  SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME       = 'partidos'
+    AND CONSTRAINT_NAME  = 'fk_partido_local'
+);
+
+SET @hay_huerfanos = (
+  SELECT COUNT(*) FROM partidos p
+   LEFT JOIN equipos e ON e.id = p.equipo_local_id
+   WHERE e.id IS NULL
+);
+
+SET @sql_fk = IF(
+  @fk_ya_existe > 0,
+  'DO 0',
+  IF(
+    @hay_huerfanos > 0,
+    'DO 0',
+    'ALTER TABLE partidos ADD CONSTRAINT fk_partido_local FOREIGN KEY (equipo_local_id) REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE'
+  )
+);
+
+PREPARE stmt_fk FROM @sql_fk;
+EXECUTE stmt_fk;
+DEALLOCATE PREPARE stmt_fk;
+
+SELECT IF(
+  @fk_ya_existe > 0,
+  'fk_partido_local verificada.',
+  IF(
+    @hay_huerfanos > 0,
+    'AVISO: no se creó la clave foránea fk_partido_local porque hay partidos con un equipo local inexistente.',
+    'fk_partido_local verificada.'
+  )
+) AS estado_migracion;
+
+-- 3) partidos.equipo_visitante_id -> equipos.id
+SET @fk_ya_existe = (
+  SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME       = 'partidos'
+    AND CONSTRAINT_NAME  = 'fk_partido_visitante'
+);
+
+SET @hay_huerfanos = (
+  SELECT COUNT(*) FROM partidos p
+   LEFT JOIN equipos e ON e.id = p.equipo_visitante_id
+   WHERE e.id IS NULL
+);
+
+SET @sql_fk = IF(
+  @fk_ya_existe > 0,
+  'DO 0',
+  IF(
+    @hay_huerfanos > 0,
+    'DO 0',
+    'ALTER TABLE partidos ADD CONSTRAINT fk_partido_visitante FOREIGN KEY (equipo_visitante_id) REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE'
+  )
+);
+
+PREPARE stmt_fk FROM @sql_fk;
+EXECUTE stmt_fk;
+DEALLOCATE PREPARE stmt_fk;
+
+SELECT IF(
+  @fk_ya_existe > 0,
+  'fk_partido_visitante verificada.',
+  IF(
+    @hay_huerfanos > 0,
+    'AVISO: no se creó la clave foránea fk_partido_visitante porque hay partidos con un equipo visitante inexistente.',
+    'fk_partido_visitante verificada.'
+  )
+) AS estado_migracion;
+
+SELECT p.id, p.equipo_local_id, p.equipo_visitante_id
+  FROM partidos p
+  LEFT JOIN equipos el ON el.id = p.equipo_local_id
+  LEFT JOIN equipos ev ON ev.id = p.equipo_visitante_id
+ WHERE el.id IS NULL OR ev.id IS NULL;
