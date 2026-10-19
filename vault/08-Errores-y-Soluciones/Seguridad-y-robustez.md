@@ -466,7 +466,77 @@ Esperado: `404`, `404` y un `Location:` que menciona `localhost`, nunca `evil.ex
 
 ---
 
-## 14. Lo que queda pendiente
+## 14. El proyecto entero no puede quedar servido por Apache
+
+### El problema
+
+La instalación por defecto de XAMPP copia el proyecto **entero** dentro de `htdocs/`, y el `DocumentRoot` de Apache apunta a `htdocs/`. Todo lo que cuelgue de ahí es descargable:
+
+| Petición | Qué se descarga |
+|---|---|
+| `/database/seeds.sql` | Los hashes bcrypt de `demo@liga.com` y `admin@liga.com` (contraseña: `password`) |
+| `/.git/` | El código fuente completo y todo el historial de commits |
+| `/vault/`, `/doc/` | La documentación interna del proyecto |
+
+El `.zip` de entrega tiene que incluir `.git` por requisito del enunciado, así que el riesgo es real: **los 392 objetos del repositorio se descargaban con HTTP 200**.
+
+### El arreglo: dos capas
+
+**Capa 1 (la principal):** el `DocumentRoot` o un `Alias` apuntan a la carpeta `public/`. Con eso, el resto del proyecto ni siquiera existe para el servidor web.
+
+```apache
+<VirtualHost *:80>
+    DocumentRoot "C:/xampp/htdocs/ProyectoBasket/public"
+    ServerName ligabasquet.local
+</VirtualHost>
+```
+
+**Capa 2 (la red de seguridad):** dos `.htaccess` incluidos en el repositorio, por si alguien deja el proyecto dentro de `htdocs/` sin configurar el servidor.
+
+En la **raíz del proyecto**:
+
+```apache
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^public/ - [L]   # lo que cuelgue de public/ se permite
+    RewriteRule ^ - [F,L]        # todo lo demás: prohibido (403)
+</IfModule>
+
+<IfModule mod_authz_core.c>
+    Require all denied           # red de seguridad si no hay mod_rewrite
+</IfModule>
+```
+
+Y en **`public/.htaccess`**, la contrapartida que vuelve a permitir el acceso:
+
+```apache
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+```
+
+⚠️ **Por qué se comparan rutas relativas y no la URL.** Una primera versión usaba `RewriteCond %{REQUEST_URI} !/public(/|$)` y fallaba en dos casos: con un `Alias` la URL ya no contiene `/public/`, y una ruta de instalación que contenga la palabra "public" (por ejemplo `/home/user/public/ProyectoBasket/`) dejaría pasar todo. Con `RewriteRule ^public/` la comparación es contra la ruta **relativa a la carpeta del proyecto**, así que da igual cómo se llame la carpeta de instalación.
+
+⚠️ **`php -S` no lee `.htaccess`.** El servidor embebido de PHP lo ignora: es una herramienta de desarrollo local, no de despliegue.
+
+### Cómo se comprobó
+
+Montando un Apache 2.4 de prueba (con `AllowOverride All`) y pidiendo cada archivo por HTTP:
+
+| Petición | Antes | Después |
+|---|---|---|
+| `/public/index.php` | 200 | **200** |
+| `/public/css/styles.css` | 200 | **200** |
+| `/database/seeds.sql` | **200** | **403** |
+| `/.git/config` | **200** | **403** |
+| `/.git/objects/...` | **200** | **403** |
+| `/README.md` | **200** | **403** |
+
+Y se repitió en los tres despliegues habituales: proyecto entero dentro de `htdocs/`, `DocumentRoot` real apuntando a `public/` y ruta de instalación con "public" en el nombre. En los tres, `public/` responde 200 y el resto 403. Cada mecanismo bloquea por sí solo, de modo que la protección aguanta aunque el servidor no tenga `mod_rewrite`.
+
+---
+
+## 15. Lo que queda pendiente
 
 Nada de lo listado bloquea la entrega, pero conviene saberlo:
 
@@ -483,4 +553,4 @@ Nada de lo listado bloquea la entrega, pero conviene saberlo:
 
 ## Archivos relacionados
 
-`../../08-Errores-y-Soluciones/Registro-de-errores.md` (errores 16–21, la historia completa de cada fallo) · `../06-Codigo-Explicado/Core/Router-explicado.md` (lista blanca en detalle) · `../06-Codigo-Explicado/Controllers/EquiposController-explicado.md` (el borrado con FK, paso a paso) · `../06-Codigo-Explicado/Controllers/AuthController-explicado.md` (sesión y bloqueo) · `../04-BD/schema-explicado.md` (las restricciones y por qué se eligieron así) · `../../tests/regresion.sh`
+`../../08-Errores-y-Soluciones/Registro-de-errores.md` (errores 16–22, la historia completa de cada fallo) · `../06-Codigo-Explicado/Core/Router-explicado.md` (lista blanca en detalle) · `../06-Codigo-Explicado/Controllers/EquiposController-explicado.md` (el borrado con FK, paso a paso) · `../06-Codigo-Explicado/Controllers/AuthController-explicado.md` (sesión y bloqueo) · `../04-BD/schema-explicado.md` (las restricciones y por qué se eligieron así) · `../../tests/regresion.sh`

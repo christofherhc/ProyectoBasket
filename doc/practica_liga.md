@@ -6,11 +6,11 @@
 
 ## 1. Arquitectura
 
-El sistema implementa una arquitectura **MVC ligero** en PHP vanilla, sin frameworks ni gestor de dependencias. Toda petición entra por un único punto: `public/index.php`, que actúa como **Front Controller** e inicializa sesión, cookies y manejador global de errores antes de delegar. `app/core/Router.php` interpreta `controller`, `action` y parámetros de la URL, y los valida contra una lista blanca declarada en la constante `RUTAS`. Las capas son: **Modelos** (datos y reglas de negocio), **Vistas** (plantillas PHP con layout compartido), **Controladores** (coordinación), **Core** (clases base reutilizables) y **Config** (constantes).
+El sistema implementa una arquitectura **MVC ligero** en PHP vanilla, sin frameworks ni gestor de dependencias. Toda petición entra por un único punto: `public/index.php`, que actúa como **Front Controller** e inicializa sesión, cookies y manejador global de errores antes de delegar. `app/core/Router.php` interpreta `controller`, `action` y parámetros de la URL, y los valida contra una lista blanca declarada en la constante `RUTAS`. Las capas son: **Modelos** (datos y reglas de negocio), **Vistas** (plantillas PHP con layout compartido), **Controladores** (coordinación), **Core** (clases base reutilizables) y **Config** (constantes). Solo la carpeta `public/` es accesible desde el navegador: los archivos `.htaccess` de la raíz y de `public/` devuelven 403 a cualquier petición ajena a esa carpeta, de modo que ni los scripts SQL con los hashes de las contraseñas de prueba ni el historial de Git quedan descargables.
 
 ## 2. Componentes Clave
 
-`Database.php` implementa el patrón *singleton* sobre PDO con `ERRMODE_EXCEPTION`, `FETCH_ASSOC` y `utf8mb4`. `Model.php` aporta `obtenerTodos()`, `obtenerPorId()`, `crear()`, `actualizar()`, `eliminar()` y `obtenerUltimoId()`. `Controller.php` resuelve la vista con `extract()` y el layout, e implementa `requiereLogin()`. `helpers.php` centraliza funciones sin clase: escapado, tokens CSRF, mensajes flash, redirecciones y validación. Los modelos `Usuario`, `Equipo`, `Jugador` y `Partido` heredan de `Model`; los controladores `AuthController`, `EquiposController`, `JugadoresController`, `PartidosController` y `EstadisticasController` coordinan los cinco módulos exigidos.
+`Database.php` implementa el patrón *singleton* sobre PDO con `ERRMODE_EXCEPTION`, `FETCH_ASSOC` y `utf8mb4`. `Model.php` aporta `obtenerTodos()`, `obtenerPorId()`, `eliminar()` y `obtenerUltimoId()`; cada modelo concreto añade sus propios `crear()` y `actualizar()`. `Controller.php` resuelve la vista con `extract()` y el layout, e implementa `requiereLogin()`. `helpers.php` centraliza funciones sin clase: escapado, tokens CSRF, mensajes flash, redirecciones y validación. Los modelos `Usuario`, `Equipo`, `Jugador` y `Partido` heredan de `Model`; los controladores `AuthController`, `EquiposController`, `JugadoresController`, `PartidosController` y `EstadisticasController` coordinan los cinco módulos exigidos.
 
 ## 3. Funcionalidades Desarrolladas
 
@@ -18,11 +18,16 @@ El sistema implementa una arquitectura **MVC ligero** en PHP vanilla, sin framew
 
 ## 4. Código Fuente Relevante
 
-El enrutamiento resuelve el controlador mediante `is_callable()` sobre un nombre de clase ya filtrado:
+El enrutamiento contrasta la URL con una lista blanca antes de cargar nada, y solo después comprueba que el método sea invocable:
 
 ```php
-if (!isset(self::RUTAS[strtolower($nombreClase)])) {
-    $this->error("Controlador no disponible.");
+if (!array_key_exists($controlador, self::RUTAS)) {
+    $this->error('Controlador no permitido. Vuelve a la página principal.');
+}
+
+$permitidas = self::RUTAS[$controlador];
+if (!in_array($accion, $permitidas, true)) {
+    $this->error('Acción no permitida para este controlador.');
 }
 ```
 
@@ -42,6 +47,6 @@ Dos detalles merecen mención: `DateTime::createFromFormat()` acepta fechas inex
 
 ## 6. Decisiones de Diseño
 
-Se eligió PHP vanilla para comprender los mecanismos sin abstracciones ocultas, y una lista blanca en el enrutador por seguridad: sólo se cargan los módulos declarados en ella. `posicion` es texto validado contra un catálogo en lugar de `ENUM`, para admitir valores nuevos sin alterar el esquema. La contraseña se almacena con el hash por defecto de PHP y las sesiones exigen cookies `HttpOnly`, `SameSite` y `Secure` bajo HTTPS. El historial Git se mantiene mediante ramas de funcionalidad y commits atómicos. Una suite de 84 comprobaciones automatizadas verifica el comportamento y restaura los datos de prueba al terminar.
+Se eligió PHP vanilla para comprender los mecanismos sin abstracciones ocultas, y una lista blanca en el enrutador por seguridad: sólo se cargan los módulos declarados en ella. `posicion` es texto validado contra un catálogo en lugar de `ENUM`, para admitir valores nuevos sin alterar el esquema. La contraseña se almacena con el hash por defecto de PHP y las sesiones exigen cookies `HttpOnly`, `SameSite` y `Secure` bajo HTTPS. El despliegue se resuelve en dos capas: apuntar el `DocumentRoot` del servidor a `public/` y, como red de seguridad, los `.htaccess` que bloquean el resto del proyecto aunque la configuración del servidor cambie. El historial Git se mantiene con commits atómicos y mensajes descriptivos. Una suite de 87 comprobaciones automatizadas verifica el comportamiento y restaura los datos de prueba al terminar.
 
-Todo cumple los requerimientos: módulos funcionales, control de versiones, documento en `/doc/practica_liga.md` e historial `.git` intacto.
+Cumplen los requerimientos: los cinco módulos funcionales, control de versiones con commits atómicos, este documento en `/doc/practica_liga.md` e historial `.git` intacto en el paquete de entrega.

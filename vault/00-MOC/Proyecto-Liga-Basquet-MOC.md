@@ -30,6 +30,7 @@ Para aprovechar al máximo el material, se recomienda recorrerlo en el siguiente
 | 16 | **Código Explicado** → [[06-Codigo-Explicado/Core/Database-explicado]] | Repasar cada archivo con explicación amplia (tras crearlo) | Paralelo a procedimientos |
 | 17 | [[07-Diario-de-Aprendizaje/Diario-Dia-02]] | Registrar lo aprendido, dudas y comprensión | Diario diario (5–10 min) |
 | 18 | [[08-Errores-y-Soluciones/Registro-de-errores]] | Consolidar soluciones encontradas | Según necesidad |
+| 18b | [[08-Errores-y-Soluciones/Seguridad-y-robustez]] | Repasar los arreglos de seguridad de la auditoría | 30 min |
 | 19 | [[09-Glosario/Terminos-clave]] | Consultar términos cuando surjan dudas | Permanente |
 | 20 | [[10-Recursos/Enlaces-de-estudio]] | Ampliación si algún concepto necesita reforzarse | Opcional |
 
@@ -111,6 +112,7 @@ Registro reflexivo por día: qué entendí, qué no entendí (dudas), errores, s
 
 ### 08. Errores y Soluciones
 - [[08-Errores-y-Soluciones/Registro-de-errores]] – Bitácora de problemas + causa + solución aplicada + lección aprendida.
+- [[08-Errores-y-Soluciones/Seguridad-y-robustez]] – Qué se corrigió en la auditoría de seguridad y por qué (lista blanca, CSRF, validación, cookies, despliegue).
 
 ### 09. Glosario
 - [[09-Glosario/Terminos-clave]] – Definiciones amplias y sencillas de términos: MVC, PDO, CRUD, FK, PK, prepared statement, front controller, routing, commit atómico, feature branch, PR, etc.

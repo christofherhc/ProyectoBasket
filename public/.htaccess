@@ -1,0 +1,19 @@
+# =============================================
+# Carpeta public/ - ÚNICA carpeta con acceso web
+# =============================================
+# Esta es la carpeta que debe ser la raíz web del servidor (DocumentRoot) o la
+# única enlazada con un Alias. Aquí se permite todo, porque es el punto de
+# entrada público de la aplicación.
+#
+# El .htaccess de la raíz del proyecto bloquea el acceso a todo lo demás
+# (app/, database/, vault/, doc/, .git/...). Este archivo es la contraparte:
+# vuelve a permitir el acceso dentro de public/, que es la única carpeta que
+# debe quedar expuesta.
+
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,granted
+    Allow from all
+</IfModule>

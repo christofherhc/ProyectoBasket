@@ -590,6 +590,60 @@ ALTER TABLE jugadores ADD UNIQUE KEY uq_jugador_numero (equipo_id, numero);
 
 ---
 
+## 22. ✅ El proyecto entero quedaba servido por Apache
+
+**Error:** `http://localhost/ProyectoBasket-Deploy/database/seeds.sql` se podía descargar sin contraseña, y con él los hashes bcrypt de los usuarios de prueba. Con el ZIP de entrega (que incluye `.git/` por requisito del enunciado) también se podía descargar el código fuente completo: los 392 objetos sueltos del repositorio respondían con HTTP 200.
+
+**Causa:** el enunciado de instalación (`INSTRUCCIONES-XAMPP.md`) pedía copiar la carpeta **entera** del proyecto dentro de `htdocs/`, y el `DocumentRoot` de Apache apuntaba a `htdocs/`. Todo lo que cuelgue de la raíz web es descargable: el proyecto no traía ningún `.htaccess` que lo impediera.
+
+**Comprobado** sirviendo el proyecto con Apache 2.4 tal como se instala:
+
+| Petición | Antes | Después |
+|---|---|---|
+| `/public/index.php` | 200 | 200 |
+| `/public/css/styles.css` | 200 | 200 |
+| `/database/seeds.sql` | **200 (1678 B con los hashes)** | **403** |
+| `/database/schema.sql` | **200** | **403** |
+| `/doc/practica_liga.md` | **200** | **403** |
+| `/vault/.../Seguridad-y-robustez.md` | **200** | **403** |
+| `/.git/config` | **200** | **403** |
+| `/.git/objects/...` | **200** | **403** |
+
+**✅ Solución aplicada, en dos niveles:**
+
+1. **La principal:** la documentación (`README.md`, `INSTRUCCIONES-XAMPP.md` y este vault) indica ahora apuntar el `DocumentRoot` o un `Alias` a la carpeta `public/`. Con eso, el resto del proyecto ni siquiera existe para el servidor web.
+2. **La red de seguridad:** dos archivos `.htaccess` que ya vienen en el repositorio.
+
+En la **raíz del proyecto**:
+
+```apache
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^public/ - [L]   # lo que cuelgue de public/ se permite
+    RewriteRule ^ - [F,L]        # todo lo demás: prohibido (403)
+</IfModule>
+
+<IfModule mod_authz_core.c>
+    Require all denied           # red de seguridad si no hay mod_rewrite
+</IfModule>
+```
+
+Y en **`public/.htaccess`**, la contrapartida que vuelve a permitir el acceso:
+
+```apache
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+```
+
+⚠️ **Por qué se comparan rutas relativas y no la URL.** Una primera versión usaba `RewriteCond %{REQUEST_URI} !/public(/|$)` y fallaba: con un `Alias` la URL ya no contiene `/public/`, y una ruta de instalación que contenga la palabra "public" (por ejemplo `/home/user/public/ProyectoBasket/`) dejaría pasar todo. Con `RewriteRule ^public/` la comparación es contra la ruta **relativa a la carpeta del proyecto**, así que da igual cómo se llame la carpeta de instalación.
+
+⚠️ **`php -S` no lee `.htaccess`.** El servidor embebido de PHP lo ignora. Es una herramienta de desarrollo local, no de despliegue.
+
+**Verificado** con Apache 2.4 en los tres escenarios: proyecto entero dentro de `htdocs/`, `DocumentRoot` real apuntando a `public/`, y ruta de instalación que contiene "public". En los tres, `public/` responde 200 y el resto 403. Cada uno de los dos mecanismos bloquea por sí solo, de modo que la protección aguanta aunque el servidor no tenga `mod_rewrite`.
+
+---
+
 ## Resumen de lecciones
 
 | Tema | Lección |
@@ -611,3 +665,5 @@ ALTER TABLE jugadores ADD UNIQUE KEY uq_jugador_numero (equipo_id, numero);
 | Confianza | El `required` del navegador es una ayuda visual, no una validación |
 | Integridad | Lo que no restringe la base hay que validarlo en el controlador |
 | Pruebas | Antes de "arreglar" el código, confirmar que el fallo no sea del test |
+| Despliegue | Lo que cuelgue del `DocumentRoot` es público: el `.htaccess` y el `DocumentRoot` correctos son dos capas, no dos opciones |
+| Servidor | `php -S` no lee `.htaccess`: es para desarrollo, no para servir |

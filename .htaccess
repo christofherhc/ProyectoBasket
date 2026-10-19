@@ -1,0 +1,55 @@
+# =============================================
+# Protección del proyecto frente a accesos directos
+# =============================================
+# Esta carpeta contiene TODO el proyecto: el código de la aplicación, los
+# scripts de la base de datos, la documentación y el historial de Git.
+#
+# Solo la carpeta public/ debe ser accesible desde el navegador. Si el proyecto
+# entero está copiado dentro de htdocs (que es lo que hace la instalación por
+# defecto de XAMPP), Apache sirve también estas carpetas y cualquiera podría
+# descargar:
+#
+#   - database/seeds.sql   -> los hashes de las contraseñas de los usuarios
+#                             de prueba
+#   - .git/                -> el código fuente completo y todo el historial
+#   - vault/, doc/         -> la documentación interna del proyecto
+#
+# La SOLUCIÓN PRINCIPAL es configurar el servidor para que la raíz web (el
+# DocumentRoot) sea la carpeta public/ y no la raíz del proyecto. Con eso,
+# este archivo ni siquiera llega a leerse.
+#
+# Este archivo es la RED DE SEGURIDAD para cuando esa configuración no se ha
+# hecho: bloquea todo lo que no esté bajo public/.
+#
+# Se usan dos mecanismos independientes, y cada uno por sí solo bastaría:
+#
+#   1. mod_rewrite -> devuelve 403 en cuanto la ruta no empieza por public/.
+#      Se comparan rutas RELATIVAS a esta carpeta, así que da igual cómo se
+#      llame la carpeta de instalación y aunque la ruta del servidor contenga
+#      la palabra "public".
+#
+#   2. mod_authz_core -> nega el acceso a esta carpeta y delega en
+#      public/.htaccess la autorización de la única carpeta pública.
+#
+# Requisito del servidor: el directorio debe permitir FollowSymLinks, porque
+# Apache no lee ningún .htaccess si no está activo. En la configuración por
+# defecto de XAMPP ya lo está.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Lo que cuelgue de public/ se permite y se deja de procesar reglas.
+    RewriteRule ^public/ - [L]
+
+    # Cualquier otra cosa dentro del proyecto: prohibido (403).
+    RewriteRule ^ - [F,L]
+</IfModule>
+
+# Red de seguridad para servidores sin mod_rewrite.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

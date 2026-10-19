@@ -11,6 +11,8 @@ Todo orientado a **facilitar lectura, estudio y comprensión** (ideal para "leer
 ```text
 ProyectoBasket/
 │
+├── .htaccess                   # Bloquea el acceso a todo el proyecto salvo public/
+│
 ├── app/                        # Núcleo de la aplicación (lógica MVC)
 │   ├── config/                 # Configuración global
 │   │   └── config.php          # Constantes BD, BASE_URL, rutas
@@ -57,6 +59,7 @@ ProyectoBasket/
 │           └── index.php
 │
 ├── public/                     # Carpeta pública (DocumentRoot)
+│   ├── .htaccess               # Autoriza el acceso (contrapartida del de la raíz)
 │   ├── index.php               # ÚNICO punto de entrada (Front Controller)
 │   └── css/
 │       └── styles.css          # Estilos CSS puros (legibles)
@@ -176,6 +179,47 @@ Cada módulo tiene su carpeta con vistas coherentes:
 
 Patrón consistente → fácil aprender.
 
+### La raíz del proyecto y el `.htaccess`
+
+**Propósito:** aquí viven el código, los scripts SQL, la documentación y el historial de Git. **Nada de esto debe ser descargable desde el navegador.**
+
+**El problema real:** la instalación por defecto de XAMPP copia el proyecto entero dentro de `htdocs/`, así que Apache sirve *todas* sus carpetas. Sin protección, cualquiera podría descargar:
+
+| Archivo | Qué se obtiene |
+|---|---|
+| `database/seeds.sql` | Los hashes bcrypt de las contraseñas de los usuarios de prueba |
+| `.git/` | El código fuente completo y todo el historial de commits |
+| `vault/`, `doc/` | La documentación interna del proyecto |
+
+**La solución en dos niveles:**
+
+1. **La principal:** apuntar el `DocumentRoot` (o un `Alias`) a la carpeta `public/`. Con eso, el resto del proyecto ni siquiera existe para el servidor web.
+2. **La red de seguridad:** el archivo `.htaccess` de esta raíz, que devuelve **403** a cualquier petición que no sea de `public/`.
+
+```apache
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^public/ - [L]   # lo que cuelgue de public/ se permite
+    RewriteRule ^ - [F,L]        # todo lo demás: prohibido (403)
+</IfModule>
+
+<IfModule mod_authz_core.c>
+    Require all denied           # y la red de seguridad, por si mod_rewrite no está
+</IfModule>
+```
+
+Y en `public/.htaccess` está la contrapartida, que vuelve a permitir el acceso:
+
+```apache
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+```
+
+⚠️ **Las dos reglas son independientes y cada una basta por sí sola**, así que la protección se mantiene aunque el servidor no tenga `mod_rewrite`. Se comparan rutas **relativas** a esta carpeta, de modo que da igual cómo se llame la carpeta de instalación.
+
+**Verificado con Apache 2.4** en los tres escenarios habituales: proyecto entero dentro de `htdocs/`, `DocumentRoot` apuntando a `public/` y ruta de instalación que contiene la palabra "public". En los tres, `public/` responde 200 y todo lo demás 403.
+
 ### `public/`
 
 **Propósito:** Única carpeta accesible desde web (DocumentRoot).
@@ -184,6 +228,7 @@ Patrón consistente → fácil aprender.
 
 - `index.php` → Front Controller. Carga todo core + router. Inicia sesión.
 - `css/styles.css` → Estilos propios, legibles, comentados mínimos.
+- `.htaccess` → Permite el acceso dentro de esta carpeta (la única pública).
 
 **Acceso:** `http://localhost/ProyectoBasket/public/`
 
@@ -270,6 +315,10 @@ respuesta navegador
 O simplemente usar: `http://localhost/ProyectoBasket/public/`
 
 Ambos funcionan. Con VirtualHost URLs más limpias.
+
+⚠️ **El `DocumentRoot` es la solución principal, pero no la única.** Si el proyecto se deja dentro de `htdocs/` y se entra por `.../public/`, el `.htaccess` de la raíz se encarga de bloquear el resto (ver la sección de la raíz del proyecto más arriba). La combinación de las dos cosas es la más segura: el `.htaccess` protege aunque alguien cambie la configuración del servidor por error.
+
+⚠️ **`php -S` no lee `.htaccess`.** El servidor embebido de PHP ignora ese archivo, así que con él no hay protección: úsalo solo para desarrollo local y nunca expongas esa carpeta a Internet.
 
 ## 8. Verificación Rápida
 

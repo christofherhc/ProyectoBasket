@@ -21,6 +21,7 @@ Este proyecto está diseñado para aprender desarrollo web paso a paso:
 
 ```text
 ProyectoBasket/
+├── .htaccess                    # Bloquea el acceso a todo el proyecto salvo public/
 ├── app/
 │   ├── config/config.php        # Configuración de BD y rutas
 │   ├── core/                    # Clases base (Database, Model, Controller, Router)
@@ -28,6 +29,7 @@ ProyectoBasket/
 │   ├── controllers/             # Controladores (Auth, Equipos, Jugadores, Partidos, Estadisticas)
 │   └── views/                   # Vistas con layout base
 ├── public/
+│   ├── .htaccess                # Autoriza el acceso (única carpeta pública)
 │   ├── index.php                # Front controller (punto de entrada)
 │   └── css/styles.css           # Estilos propios
 ├── database/
@@ -43,7 +45,7 @@ ProyectoBasket/
 
 1. **Clonar o ubicar el proyecto**
 
-   Colocar la carpeta `ProyectoBasket/` en el directorio de tu servidor (ej. `htdocs/` en XAMPP).
+   Colocar la carpeta `ProyectoBasket/` donde se quiera, por ejemplo en `htdocs/`.
 
 2. **Crear la base de datos**
 
@@ -56,13 +58,27 @@ ProyectoBasket/
 
    Editar `app/config/config.php` si es necesario (usuario/contraseña/host/nombre BD). Por defecto para XAMPP: `root`, contraseña vacía, BD `liga_basquet`.
 
-4. **Configurar DocumentRoot (recomendado)**
+4. **Apuntar el servidor a `public/` (importante)**
 
-   Apuntar el servidor a `ProyectoBasket/public/` para tener URLs limpias. En XAMPP puedes usar un VirtualHost o acceder como `http://localhost/ProyectoBasket/public/`.
+   La carpeta `public/` es la **única** que debe quedar accesible desde el navegador. Hay dos formas de hacerlo:
+
+   - **Con un VirtualHost** (lo recomendado, URLs limpias):
+
+     ```apache
+     <VirtualHost *:80>
+         DocumentRoot "C:/xampp/htdocs/ProyectoBasket/public"
+         ServerName ligabasquet.local
+     </VirtualHost>
+     ```
+
+   - **Sin tocar la configuración**, dejando el proyecto dentro de `htdocs/` y entrando por `.../public/`. En este caso el archivo `.htaccess` de la raíz del proyecto se encarga de bloquear `app/`, `database/`, `doc/`, `vault/` y `.git/`, de modo que solo se sirva `public/`.
+
+   ⚠️ **Por qué importa:** si el proyecto entero queda bajo el DocumentRoot sin el `.htaccess`, cualquiera podría descargar `database/seeds.sql` (con los hashes de las contraseñas de prueba) y el código fuente completo desde `.git/`.
 
 5. **Ejecutar**
 
-   Abrir `http://localhost/ProyectoBasket/public/` en el navegador.
+   Con VirtualHost: `http://ligabasquet.local/`.
+   Sin él: `http://localhost/ProyectoBasket/public/`.
 
 ## Flujo de desarrollo (Git)
 
