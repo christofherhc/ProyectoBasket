@@ -49,7 +49,7 @@ class EquiposController extends Controller {
 
     public function editar(array $params): void {
         $this->requiereLogin();
-        $id = (int)($params['id'] ?? 0);
+        $id = enteroPositivo($params['id'] ?? '') ?? 0;
         $equipo = $this->equipoModel->obtenerPorId($id);
         if ($equipo === null) {
             flashError('Equipo no encontrado');
@@ -68,7 +68,7 @@ class EquiposController extends Controller {
         $this->requiereLogin();
         exigirPost('controller=Equipos&action=index');
 
-        $id = (int)post('id');
+        $id = enteroPositivo(post('id')) ?? 0;
         [$nombre, $ciudad, $fundacionInt, $errores] = $this->validarCampos($id);
 
         if ($errores === []) {
@@ -98,7 +98,7 @@ class EquiposController extends Controller {
         $this->requiereLogin();
         exigirPost('controller=Equipos&action=index');
 
-        $id = (int)post('id');
+        $id = enteroPositivo(post('id')) ?? 0;
 
         if ($id <= 0) {
             flashError('ID de equipo inválido');

@@ -688,6 +688,29 @@ Cada intento fallido se guarda como marca de tiempo; solo cuentan los que caen d
 
 ---
 
+## 24. ✅ Un `(int)` no era una validación de id
+
+**Error:** `?id=1abc` cargaba el registro con id 1, en lugar de decir que el id no era válido.
+
+**Causa:** `(int)'1abc'` vale `1` en PHP. El cast se queda con el prefijo numérico y descarta el resto sin avisar. En este proyecto no hay propiedad por usuario, así que no era una escalada de privilegios, pero sí una puerta abierta a confusion.
+
+**✅ Solución aplicada:** un helper que exige que el texto sea **solo dígitos**:
+
+```php
+function enteroPositivo($valor, string $defecto = '0'): ?int {
+    $texto = trim((string)$valor);
+    if ($texto === '' || !ctype_digit($texto)) {
+        return null;
+    }
+    $numero = (int)$texto;
+    return $numero > 0 ? $numero : null;
+}
+```
+
+Y en los controladores: `$id = enteroPositivo($params['id'] ?? '') ?? 0;`
+
+---
+
 ## Resumen de lecciones
 
 | Tema | Lección |
@@ -713,3 +736,4 @@ Cada intento fallido se guarda como marca de tiempo; solo cuentan los que caen d
 | Servidor | `php -S` no lee `.htaccess`: es para desarrollo, no para servir |
 | Rate limiting | Un contador en la sesión no frena a nadie: el atacante deja de mandar la cookie |
 | Temporización | Un hash "parecido" a un bcrypt puede no serlo: hay que medirlo, no suponerlo |
+| Validación | Un `(int)` recorta lo que no es número sin avisar: para ids, exige solo dígitos |

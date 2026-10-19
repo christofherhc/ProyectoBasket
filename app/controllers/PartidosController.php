@@ -61,7 +61,7 @@ class PartidosController extends Controller {
 
     public function editar(array $params): void {
         $this->requiereLogin();
-        $id = (int)($params['id'] ?? 0);
+        $id = enteroPositivo($params['id'] ?? '') ?? 0;
         $partido = $this->partidoModel->obtenerPorId($id);
         if ($partido === null) {
             flashError('Partido no encontrado');
@@ -82,7 +82,7 @@ class PartidosController extends Controller {
         $this->requiereLogin();
         exigirPost('controller=Partidos&action=index');
 
-        $id = (int)post('id');
+        $id = enteroPositivo(post('id')) ?? 0;
         [$datos, $errores] = $this->validarCampos();
 
         if ($errores === []) {
@@ -120,7 +120,7 @@ class PartidosController extends Controller {
         $this->requiereLogin();
         exigirPost('controller=Partidos&action=index');
 
-        $id = (int)post('id');
+        $id = enteroPositivo(post('id')) ?? 0;
 
         if ($id <= 0) {
             flashError('ID de partido inválido');
@@ -144,8 +144,11 @@ class PartidosController extends Controller {
     private function validarCampos(): array {
         $local     = (int)post('equipo_local_id', '0');
         $visitante = (int)post('equipo_visitante_id', '0');
-        $puntosLocal     = trim(post('puntos_local', '0'));
-        $puntosVisitante = trim(post('puntos_visitante', '0'));
+        // Si el campo no viene, post() devuelve '' y el marcador se avisa
+        // como obligatorio. Antes el valor por defecto era '0', y un POST
+        // sin los campos guardaba un 0-0 sin avisar.
+        $puntosLocal     = trim(post('puntos_local'));
+        $puntosVisitante = trim(post('puntos_visitante'));
         $fechaBruta = trim(post('fecha'));
 
         $_SESSION['old_partido'] = [

@@ -182,6 +182,31 @@ function cabeEnColumna(string $valor, int $maximo): bool {
 }
 
 /**
+ * Convierte un texto en un entero positivo, o devuelve null si no lo es.
+ *
+ * La diferencia con un simple (int): (int)'1abc' vale 1, así que un id con
+ * basura al final se aceptaría en silencio. Aquí el texto tiene que ser
+ * SOLO dígitos: o es un número entero, o no es un id válido.
+ *
+ * @param mixed  $valor
+ * @param string $defecto
+ * @return int|null
+ */
+function enteroPositivo($valor, string $defecto = '0'): ?int {
+    if (!is_string($valor) && !is_int($valor)) {
+        $valor = $defecto;
+    }
+
+    $texto = trim((string)$valor);
+    if ($texto === '' || !ctype_digit($texto)) {
+        return null;
+    }
+
+    $numero = (int)$texto;
+    return $numero > 0 ? $numero : null;
+}
+
+/**
  * Normaliza una fecha de `datetime-local` al formato que espera MySQL.
  *
  * Acepta "AAAA-MM-DDTHH:MM" y "AAAA-MM-DD HH:MM:SS".

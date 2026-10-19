@@ -185,9 +185,9 @@ La versión final (secciones 2, 5 y 6) usa `KEY` dentro del `CREATE TABLE`, `CRE
 
 **Lección general:** cuando un script de base de datos no es idempotente, la causa casi siempre es un elemento declarado fuera de su bloque (índices, constraints, triggers).
 
-## 9-bis. ⚠️ Los índices únicos y las bases que ya existían
+## 9-bis. ⚠️ Las restricciones y las bases que ya existían
 
-Después de la auditoría se añadieron dos índices únicos: `uq_jugador_camiseta (equipo_id, numero)`, para que un dorsal no se repita dentro del mismo equipo, y `uq_equipo_nombre (nombre)`, para que dos equipos no se llamen igual. Aquí está el problema que dejaba la solución a medias.
+Después de la auditoría se añadieron dos índices únicos (`uq_jugador_camiseta`, para los dorsales, y `uq_equipo_nombre`, para los nombres de equipo) y tres claves foráneas. Aquí está el problema que dejaba la solución a medias.
 
 ⚠️ **`CREATE TABLE IF NOT EXISTS` no actualiza una tabla que ya existe.** Su nombre lo dice: "crea la tabla si no hay ninguna". Si el usuario ya tenía la base creada con una versión anterior del script, la tabla `jugadores` ya estaba y **el `CREATE TABLE` se saltaba entero**: el índice inline nunca se creaba, y el usuario que creyera que la restricción estaba activa seguía pudiendo meter dorsales repetidos sin enterarse.
 
@@ -262,6 +262,48 @@ AVISO: no se creó el índice único uq_equipo_nombre porque hay equipos con el 
 nombre       repetidos  ids_afectados
 Los Lakers  2          1,2
 ```
+
+### Y las claves foráneas también se recuperan
+
+Los índices únicos no eran lo único que faltaba en una base antigua. Las **claves foráneas** tampoco se creaban, y son justo lo que impide borrar un equipo que tiene jugadores o partidos (el error #16 del registro: pantalla en blanco por el error 1451).
+
+El bloque final de `schema.sql` hace lo mismo para las tres FKs:
+
+```sql
+SET @fk_ya_existe = (
+  SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS
+  WHERE CONSTRAINT_SCHEMA = DATABASE()
+    AND TABLE_NAME       = 'jugadores'
+    AND CONSTRAINT_NAME  = 'fk_jugador_equipo'
+);
+
+-- ¿Hay jugadores cuyo equipo no existe?
+SET @hay_huerfanos = (
+  SELECT COUNT(*) FROM jugadores j
+   LEFT JOIN equipos e ON e.id = j.equipo_id
+   WHERE e.id IS NULL
+);
+
+SET @sql_fk = IF(
+  @fk_ya_existe > 0,
+  'DO 0',
+  IF(
+    @hay_huerfanos > 0,
+    'DO 0',
+    'ALTER TABLE jugadores ADD CONSTRAINT fk_jugador_equipo FOREIGN KEY (equipo_id) REFERENCES equipos(id) ON DELETE RESTRICT ON UPDATE CASCADE'
+  )
+);
+```
+
+⚠️ **La comprobación de huérfanos es la que evita que el `ALTER` reviente.** Si un jugador apunta a un equipo que ya no existe, añadir la FK falla con el error 1452 y aborta la importación. Con la comprobación previa, la FK se omite, se avisa y el resto del esquema se importa igual.
+
+**Verificado en los tres escenarios**, con las FKs y los índices a la vez:
+
+| Base de partida | Qué se crea | Import |
+|---|---|---|
+| Vacía | Todo, en el `CREATE TABLE` | Sin errores |
+| Antigua sin duplicados ni huérfanos | Índices y FKs con `ALTER` | Sin errores |
+| Antigua con huérfanos | La FK afectada se omite y avisa | **Sin errores**, exit 0 |
 
 ⚠️ **El mensaje de cada tabla dice qué fila sobra.** Con el nombre del equipo duplicado, el usuario sabe exactamente qué dos equipos elegir entre ellos; con el dorsal, qué dos jugadores.
 

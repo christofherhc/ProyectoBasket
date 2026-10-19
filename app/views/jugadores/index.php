@@ -21,11 +21,11 @@
         <tbody>
             <?php foreach ($jugadores as $jugador): ?>
                 <tr>
-                    <td><?= htmlspecialchars((string)$jugador['id']) ?></td>
-                    <td><?= htmlspecialchars($jugador['nombre']) ?></td>
-                    <td><?= htmlspecialchars($jugador['numero'] ?? '-') ?></td>
-                    <td><?= htmlspecialchars($jugador['posicion'] ?? '-') ?></td>
-                    <td><?= htmlspecialchars($jugador['nombre_equipo'] ?? '-') ?></td>
+                    <td><?= e($jugador['id']) ?></td>
+                    <td><?= e($jugador['nombre']) ?></td>
+                    <td><?= e($jugador['numero'] ?? '-') ?></td>
+                    <td><?= e($jugador['posicion'] ?? '-') ?></td>
+                    <td><?= e($jugador['nombre_equipo'] ?? '-') ?></td>
                     <td>
                         <a href="<?= BASE_URL ?>?controller=Jugadores&action=editar&id=<?= $jugador['id'] ?>" class="btn btn-secondary">Editar</a>
                                                 <form action="<?= BASE_URL ?>?controller=Jugadores&action=eliminar" method="POST" class="inline-form"

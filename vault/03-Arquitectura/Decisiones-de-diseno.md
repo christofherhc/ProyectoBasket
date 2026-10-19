@@ -160,6 +160,14 @@ Al diseñar este proyecto priorizamos:
 - Partidos: equipos distintos, obligatorios
 - Trim + strtolower(email) → normalización
 
+⚠️ **Un `(int)` no es una validación.** `(int)'1abc'` vale `1`, así que un id con basura al final se aceptaría en silencio y se abriría el registro equivocado. Para los ids se usa el helper `enteroPositivo()`, que exige que el texto sea **solo dígitos** o no es un id válido:
+
+```php
+$id = enteroPositivo($params['id'] ?? '') ?? 0;
+```
+
+⚠️ **Un campo que no llega no es un valor por defecto.** Si el marcador no viene en el POST, `post('puntos_local')` devuelve `''` y se avisa de que es obligatorio. Antes el valor por defecto era `'0'` y se guardaba un 0-0 sin decir nada.
+
 ## 12. Git: Feature Branches + Commits Atómicos
 
 **Decisión:** Flujo con ramas por funcionalidad: `feature/auth`, `feature/equipos`, etc. + commits atómicos descriptivos.

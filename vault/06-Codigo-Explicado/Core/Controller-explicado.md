@@ -127,6 +127,10 @@ Así el HTML (menú, estilos, pie) se escribe **una vez** y todas las páginas l
 
 `require_once` en vez de `require`: si el layout ya se cargó en esta petición, PHP lo ignora. Sin el `_once`, la segunda llamada lo cargaría otra vez y tendrías el menú duplicado.
 
+⚠️ **Aquí se cambió a `require`.** Con `require_once`, una segunda llamada a `view()` en la misma petición **no renderizaría nada**: PHP vería que el layout ya está cargado y se lo saltaría, con lo que la pantalla saldría vacía. Ahora cada llamada a `view()` renderiza, que es lo que se espera de un método que "dibuja una vista".
+
+⚠️ **Lo que sí debe seguir siendo `require_once` es la vista concreta**, dentro del layout: ahí el objetivo es que la vista no se cargue dos veces, y la comprobación `is_file()` protege de que la ruta exista.
+
 ### Nota sobre la ruta
 
 El código usa `require_once '../app/views/layouts/main.php'` (ruta relativa). Funciona porque **todos** los archivos se incluyen desde `public/index.php`, así que el directorio de trabajo siempre es `public/`. La alternativa robusta es anclar la ruta con `__DIR__`:

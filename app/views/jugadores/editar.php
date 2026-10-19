@@ -2,16 +2,16 @@
 
 <form action="<?= BASE_URL ?>?controller=Jugadores&action=actualizar" method="POST">
     <?= csrfCampo() ?>
-    <input type="hidden" name="id" value="<?= htmlspecialchars((string)$jugador['id']) ?>">
+    <input type="hidden" name="id" value="<?= e($jugador['id']) ?>">
 
     <div class="form-group">
         <label for="nombre">Nombre *</label>
-        <input type="text" id="nombre" name="nombre" value="<?= htmlspecialchars($old['nombre'] ?? $jugador['nombre']) ?>" required>
+        <input type="text" id="nombre" name="nombre" value="<?= e($old['nombre'] ?? $jugador['nombre']) ?>" required>
     </div>
 
     <div class="form-group">
         <label for="numero">Número de camiseta</label>
-        <input type="number" id="numero" name="numero" min="0" max="99" value="<?= htmlspecialchars((string)($old['numero'] ?? $jugador['numero'] ?? '')) ?>">
+        <input type="number" id="numero" name="numero" min="0" max="99" value="<?= e(($old['numero'] ?? $jugador['numero'] ?? '')) ?>">
     </div>
 
     <div class="form-group">
@@ -32,7 +32,7 @@
             <option value="">-- Seleccionar equipo --</option>
             <?php foreach ($equipos as $equipo): ?>
                 <option value="<?= $equipo['id'] ?>" <?= ((int)($old['equipo_id'] ?? $jugador['equipo_id'])) === (int)$equipo['id'] ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($equipo['nombre']) ?>
+                    <?= e($equipo['nombre']) ?>
                 </option>
             <?php endforeach; ?>
         </select>

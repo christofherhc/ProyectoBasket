@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= isset($titulo) ? htmlspecialchars($titulo) . ' - Liga de Básquetbol' : 'Liga de Básquetbol' ?></title>
+    <title><?= isset($titulo) ? e($titulo) . ' - Liga de Básquetbol' : 'Liga de Básquetbol' ?></title>
     <link rel="stylesheet" href="<?= BASE_URL ?>css/styles.css">
 </head>
 <body>
@@ -35,14 +35,14 @@
         <div class="container">
             <?php if (isset($_SESSION['error'])): ?>
                 <div class="alert alert-error">
-                    <?= htmlspecialchars($_SESSION['error']) ?>
+                    <?= e($_SESSION['error']) ?>
                 </div>
                 <?php unset($_SESSION['error']); ?>
             <?php endif; ?>
 
             <?php if (isset($_SESSION['exito'])): ?>
                 <div class="alert alert-success">
-                    <?= htmlspecialchars($_SESSION['exito']) ?>
+                    <?= e($_SESSION['exito']) ?>
                 </div>
                 <?php unset($_SESSION['exito']); ?>
             <?php endif; ?>

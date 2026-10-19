@@ -20,10 +20,10 @@
         <tbody>
             <?php foreach ($equipos as $equipo): ?>
                 <tr>
-                    <td><?= htmlspecialchars((string)$equipo['id']) ?></td>
-                    <td><?= htmlspecialchars($equipo['nombre']) ?></td>
-                    <td><?= htmlspecialchars($equipo['ciudad']) ?></td>
-                    <td><?= htmlspecialchars($equipo['fundacion'] ?? '-') ?></td>
+                    <td><?= e($equipo['id']) ?></td>
+                    <td><?= e($equipo['nombre']) ?></td>
+                    <td><?= e($equipo['ciudad']) ?></td>
+                    <td><?= e($equipo['fundacion'] ?? '-') ?></td>
                     <td>
                         <a href="<?= BASE_URL ?>?controller=Equipos&action=editar&id=<?= $equipo['id'] ?>" class="btn btn-secondary">Editar</a>
                                                 <form action="<?= BASE_URL ?>?controller=Equipos&action=eliminar" method="POST" class="inline-form"
