@@ -197,6 +197,9 @@ echo "════════════════════════�
 check "crear equipo valido -> 302" "302" "$(POST "controller=Equipos&action=guardar" "csrf_token=$TOKEN&nombre=ZZ%20Sin%20Partidos&ciudad=Prueba&fundacion=1990")"
 R=$(cuerpo -b "$JAR" "$BASE?controller=Equipos&action=index")
 contiene "  el equipo nuevo aparece" "ZZ Sin Partidos" "$R"
+# Nombre de equipo repetido: mensaje claro en vez del error 1062 de MySQL.
+contiene "  avisa del nombre de equipo duplicado" "Ya existe un equipo con ese nombre" "$(POSTL "controller=Equipos&action=guardar" "csrf_token=$TOKEN&nombre=Los%20Lakers&ciudad=Otra&fundacion=1990")"
+check "  el equipo duplicado NO se crea" "1" "$(mysql_valor "SELECT COUNT(*) FROM equipos WHERE nombre='Los Lakers'")"
 check "crear jugador valido -> 302" "302" "$(POST "controller=Jugadores&action=guardar" "csrf_token=$TOKEN&nombre=ZZ%20Jugador&numero=42&posicion=Base&equipo_id=4")"
 R=$(cuerpo -b "$JAR" "$BASE?controller=Jugadores&action=index")
 contiene "  el jugador nuevo aparece" "ZZ Jugador" "$R"

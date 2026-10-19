@@ -578,13 +578,23 @@ if (!$fecha || DateTime::getLastErrors()['warning_count']) {
 
 **Error:** se puede guardar `posicion = "ADMIN"` y dos jugadores con el mismo dorsal en el mismo equipo.
 
-**Causa:** `jugadores.posicion` es `VARCHAR(50)` y `numero` es `INT UNSIGNED` sin más restricciones. No hay `UNIQUE (equipo_id, numero)` ni lista blanca de posiciones. `equipos.nombre` tampoco es único.
+**Causa:** `jugadores.posicion` es `VARCHAR(50)` y `numero` es `INT UNSIGNED` sin más restricciones. No hay `UNIQUE (equipo_id, numero)` ni lista blanca de posiciones. `equipos.nombre` tampoco es único: se podían crear dos equipos llamados igual y en la tabla de posiciones salían dos filas indistinguibles.
 
 **✅ Solución aplicada:** validar la posición contra la lista del enunciado (Base, Escolta, Alero, Ala-Pívot, Pívot) y añadir la restricción en el esquema:
 
 ```sql
-ALTER TABLE jugadores ADD UNIQUE KEY uq_jugador_numero (equipo_id, numero);
+ALTER TABLE jugadores ADD UNIQUE KEY uq_jugador_camiseta (equipo_id, numero);
+ALTER TABLE equipos    ADD UNIQUE KEY uq_equipo_nombre (nombre);
 ```
+
+Y en el controlador, un mensaje que apunte al campo en vez del error genérico 1062:
+
+```php
+// Equipo.php
+public function existeNombre(string $nombre, int $ignorarId = 0): bool { ... }
+```
+
+⚠️ **El `ignorarId` es imprescindible al editar:** si no, el propio equipo que se está guardando contaría como duplicado de sí mismo y no se podría editar sin cambiarle el nombre.
 
 ⚠️ `VARCHAR` se eligió a propósito (ver `schema-explicado.md`, sección 3) para no bloquear valores nuevos; la consecuencia es que **la validación tiene que vivir en el controlador**, no en la base.
 

@@ -32,7 +32,10 @@ CREATE TABLE IF NOT EXISTS equipos (
   nombre VARCHAR(100) NOT NULL COMMENT 'Nombre del equipo',
   ciudad VARCHAR(100) NOT NULL COMMENT 'Ciudad de origen',
   fundacion YEAR NULL COMMENT 'Año de fundación (opcional)',
-  creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+  creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+  -- Dos equipos no pueden llamarse igual: en la tabla de posiciones dos filas
+  -- con el mismo nombre son indistinguibles para el usuario.
+  UNIQUE KEY uq_equipo_nombre (nombre)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =============================================
@@ -74,18 +77,19 @@ CREATE TABLE IF NOT EXISTS partidos (
 -- 5. AJUSTES QUE NO PUEDEN IR EN EL CREATE TABLE
 --
 -- CREATE TABLE IF NOT EXISTS no modifica una tabla que ya existe, así que
--- la clave uq_jugador_camiseta solo se crea con una base nueva. Este bloque
--- la añade también sobre una base importada antes de este cambio.
+-- los índices UNIQUE solo se crean con una base nueva. Este bloque los añade
+-- también sobre una base importada antes de estos cambios.
 --
 -- Se consulta information_schema en lugar de "DROP TABLE" para no perder
 -- datos: reimportar el esquema nunca debe ser una operación destructiva.
 --
--- Además se comprueban los dorsales duplicados ANTES de añadir la clave. Si
--- una base antigua los tiene, el ALTER falla con el error 1062 y aborta toda
--- la importación del esquema, dejando al usuario sin esquema. En ese caso el
+-- Además se comprueban los duplicados ANTES de añadir cada clave. Si una
+-- base antigua los tiene, el ALTER falla con el error 1062 y aborta toda la
+-- importación del esquema, dejando al usuario sin esquema. En ese caso el
 -- índice se omite y se avisa, que es mejor que un import que se corta a mitad.
 -- =============================================
 
+-- --- Índice único de dorsales por equipo ---
 SET @indice_ya_existe = (
   SELECT COUNT(*) FROM information_schema.STATISTICS
   WHERE TABLE_SCHEMA = DATABASE()
@@ -128,4 +132,46 @@ SELECT equipo_id, numero, COUNT(*) AS repetidos, GROUP_CONCAT(id ORDER BY id) AS
   FROM jugadores
  WHERE numero IS NOT NULL
  GROUP BY equipo_id, numero
+HAVING COUNT(*) > 1;
+
+-- --- Índice único del nombre de equipo ---
+SET @indice_ya_existe = (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME   = 'equipos'
+    AND INDEX_NAME   = 'uq_equipo_nombre'
+);
+
+SET @hay_duplicados = (
+  SELECT COUNT(*) FROM (
+    SELECT nombre
+      FROM equipos
+     GROUP BY nombre
+    HAVING COUNT(*) > 1
+  ) AS repetidos
+);
+
+SET @sql_indice = IF(
+  @indice_ya_existe > 0,
+  'DO 0',
+  IF(
+    @hay_duplicados > 0,
+    'DO 0',
+    'ALTER TABLE equipos ADD UNIQUE KEY uq_equipo_nombre (nombre)'
+  )
+);
+
+PREPARE stmt_indice FROM @sql_indice;
+EXECUTE stmt_indice;
+DEALLOCATE PREPARE stmt_indice;
+
+SELECT IF(
+  @hay_duplicados > 0,
+  'AVISO: no se creó el índice único uq_equipo_nombre porque hay equipos con el mismo nombre.',
+  'uq_equipo_nombre verificado.'
+) AS estado_migracion;
+
+SELECT nombre, COUNT(*) AS repetidos, GROUP_CONCAT(id ORDER BY id) AS ids_afectados
+  FROM equipos
+ GROUP BY nombre
 HAVING COUNT(*) > 1;

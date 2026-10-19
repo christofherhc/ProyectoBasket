@@ -397,8 +397,21 @@ public function guardar(): void {
 | 5 | `fundacion=abc` se convertía en un año basura | Baja | `ctype_digit()` antes de convertir |
 | 6 | `die()` sin escapar en el Router | Baja | El Router ya no imprime el dato; usa `error()` con 404 |
 | 7 | Sin rate limit en el login | Media | Bloqueo tras 5 intentos en 15 minutos |
+| 8 | El nombre de equipo podía repetirse | Media | `existeNombre()` en el controlador + `UNIQUE (nombre)` en el esquema |
 
-⚠️ **Lo que sigue abierto a propósito:** el nombre de equipo **no** es único. Dos equipos pueden llamarse "Real Madrid". No se añade `UNIQUE` porque el enunciado no lo pide y en una liga real puede haber equipos con el mismo nombre en ciudades distintas. Si algún día lo necesitas, es un `ALTER TABLE equipos ADD UNIQUE (nombre)`.
+⚠️ **Lo que sigue abierto a propósito:** el bloqueo de intentos de login se guarda en la **sesión**, así que un atacante que abra una sesión nueva en cada intento vuelve a empezar el contador. Es la limitación conocida de un contador en sesión; la solución sería guardarlo en la base de datos o por IP. Está anotado en `../../08-Errores-y-Soluciones/Seguridad-y-robustez.md` (sección 8).
+
+### El nombre de equipo no puede repetirse
+
+```php
+} elseif ($this->equipoModel->existeNombre($nombre, $ignorarId ?? 0)) {
+    $errores[] = 'Ya existe un equipo con ese nombre';
+}
+```
+
+⚠️ **El `$ignorarId` es lo que hace que se pueda editar.** Sin él, el equipo que se está guardando contaría como duplicado de sí mismo y la edición sería imposible. Por eso `actualizar()` llama a `validarCampos($id)` y `guardar()` a `validarCampos()`.
+
+⚠️ **La comparación no distingue mayúsculas,** igual que la de la base: la collation `utf8mb4_unicode_ci` hace que "los lakers" y "Los Lakers" sean el mismo nombre. Así el mensaje del controlador y el `UNIQUE` de la base cuentan exactamente lo mismo.
 
 ---
 

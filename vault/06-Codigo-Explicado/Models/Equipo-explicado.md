@@ -157,9 +157,12 @@ CREATE TABLE IF NOT EXISTS equipos (
   nombre VARCHAR(100) NOT NULL COMMENT 'Nombre del equipo',
   ciudad VARCHAR(100) NOT NULL COMMENT 'Ciudad de origen',
   fundacion YEAR NULL COMMENT 'Año de fundación (opcional)',
-  creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+  creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_equipo_nombre (nombre)
 );
 ```
+
+⚠️ **`UNIQUE KEY uq_equipo_nombre (nombre)`** impide que dos equipos se llamen igual. Se añadió al ver el efecto real en la tabla de posiciones: dos filas con el mismo nombre son indistinguibles para quien las lee, porque esa tabla no muestra la ciudad. La comprobación amable la hace el controlador con `existeNombre()`; el índice es la garantía final.
 
 ### `YEAR` en lugar de `INT` o `SMALLINT`
 
