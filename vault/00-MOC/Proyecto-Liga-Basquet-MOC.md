@@ -28,6 +28,7 @@ Para aprovechar al máximo el material, se recomienda recorrerlo en el siguiente
 | 14 | [[04-BD/Datos-prueba]] | Seeds y utilidad para pruebas/estudio | 10 min |
 | 15 | **Procedimientos** → [[05-Procedimientos/Dia-01-Inicializar-proyecto]] | Seguir día a día los 8 días reales de trabajo | 2 semanas |
 | 16 | **Código Explicado** → [[06-Codigo-Explicado/Core/Database-explicado]] | Repasar cada archivo con explicación amplia (tras crearlo) | Paralelo a procedimientos |
+| 16b | [[06-Codigo-Explicado/Core/LimitadorIntentos-explicado]] | Entender el bloqueo de intentos de login (IP + cuenta, concurrencia) | 20 min |
 | 17 | [[07-Diario-de-Aprendizaje/Diario-Dia-02]] | Registrar lo aprendido, dudas y comprensión | Diario diario (5–10 min) |
 | 18 | [[08-Errores-y-Soluciones/Registro-de-errores]] | Consolidar soluciones encontradas | Según necesidad |
 | 18b | [[08-Errores-y-Soluciones/Seguridad-y-robustez]] | Repasar los arreglos de seguridad de la auditoría | 30 min |
@@ -80,6 +81,7 @@ Explicaciones línea por línea, por bloques, con propósito, conceptos y ejempl
 - [[06-Codigo-Explicado/Core/Router-explicado]] – Parseo de URLs, mapeo controller/action, parámetros, valores por defecto, validación.
 - [[06-Codigo-Explicado/Core/Controller-explicado]] – Clase base, método `view()`, paso de datos a vistas, helpers para renderizado.
 - [[06-Codigo-Explicado/Core/Model-explicado]] – Clase base reutilizable, CRUD genérico, consultas comunes, prepared statements.
+- [[06-Codigo-Explicado/Core/LimitadorIntentos-explicado]] – Bloqueo de intentos de login: por qué no en la sesión, por qué IP + cuenta, y el bloqueo de archivos.
 
 **Models:**
 - [[06-Codigo-Explicado/Models/Usuario-explicado]] – Modelo de usuarios, validaciones, hash, login, métodos de búsqueda.

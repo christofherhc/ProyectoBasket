@@ -711,6 +711,59 @@ Y en los controladores: `$id = enteroPositivo($params['id'] ?? '') ?? 0;`
 
 ---
 
+## 25. ✅ El bloqueo por IP compartida echaba a cuentas ajenas
+
+**Error:** cinco intentos fallidos contra `demo@liga.com` bloqueaban **también** a `admin@liga.com`, siempre que las dos cuentas salieran desde la misma IP.
+
+**Causa:** la clave del contador era solo la dirección IP. Es la forma más rápida de frenar a un atacante, pero tiene un coste: en un aula, una oficina o cualquier red con NAT, muchas máquinas comparten la misma IP pública. Cinco errores tipográficos de una persona dejaban fuera a todo el mundo durante 15 minutos.
+
+**✅ Solución aplicada:** la clave combina la IP **con la cuenta que se intenta entrar**:
+
+```php
+private static function claveDeBloqueo(string $email): string {
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'desconocida');
+    return $ip . '|' . strtolower($email);
+}
+```
+
+- El atacante que prueba mil contraseñas contra `demo@liga.com` sigue topándose con el mismo bloqueo, porque su clave no cambia.
+- Un usuario que se equivoca cinco veces bloquea **su** cuenta desde esa IP, no las de los demás.
+- Otra cuenta de la misma IP entra con normalidad.
+
+**Verificado:** tras cinco fallos contra `demo@liga.com`, `admin@liga.com` entra bien con su contraseña, y `demo@liga.com` sigue bloqueada.
+
+### Y de paso: el contador perdía intentos si llegaban a la vez
+
+**Error:** con peticiones simultáneas, el contador se quedaba muy por debajo de la realidad.
+
+**Causa:** `registrarFallido()` leía el archivo **sin** bloqueo y lo escribía **con** bloqueo. Entre la lectura y la escritura cabía otra petición, y su registro se perdía. Medido con 20 procesos en paralelo registrando 50 intentos cada uno:
+
+| Versión | Intentos registrados de 1000 |
+|---|---|
+| Leer sin bloqueo, escribir con bloqueo | **9** (se perdían 991) |
+| Leer y escribir bajo el mismo bloqueo | **1000** |
+
+⚠️ **Eso rompía la protección entera.** Con las peticiones en paralelo (que es justo lo que hace un script de fuerza bruta), el bloqueo apenas se activaba: el atacante podía probar muchas contraseñas a la vez y el contador no llegaba ni a cinco.
+
+**✅ Solución aplicada:** todo el ciclo leer-modificar-escribir ocurre con el archivo bloqueado en exclusiva, y también la lectura usa un bloqueo compartido:
+
+```php
+if (!flock($manejador, LOCK_EX)) { ... }
+$contenido = stream_get_contents($manejador);
+$intentos  = $operacion(self::decodificar((string)$contenido));
+ftruncate($manejador, 0);
+rewind($manejador);
+fwrite($manejador, (string)json_encode($vivos));
+```
+
+⚠️ **Leer sin bloqueo también tenía un efecto perverse.** Si la lectura coincidía con una escritura a medio hacer, el JSON se leía incompleto, `json_decode` devolvía `null` y el contador se reiniciaba a cero: el bloqueo se desarmaba solo.
+
+⚠️ **`limpiar()` ya no borra el archivo, lo vacía.** Un `unlink` suelto compite con una escritura simultánea y puede dejar el contador resucitado justo después de un login correcto. Vaciarlo con el archivo bloqueado no tiene esa carrera.
+
+⚠️ **Si el estado no se puede guardar, se avisa.** Antes el fallo de disco pasaba en silencio y el limitador dejaba de contar sin que nadie se enterase. Ahora deja un `error_log` para el administrador.
+
+---
+
 ## Resumen de lecciones
 
 | Tema | Lección |
@@ -737,3 +790,5 @@ Y en los controladores: `$id = enteroPositivo($params['id'] ?? '') ?? 0;`
 | Rate limiting | Un contador en la sesión no frena a nadie: el atacante deja de mandar la cookie |
 | Temporización | Un hash "parecido" a un bcrypt puede no serlo: hay que medirlo, no suponerlo |
 | Validación | Un `(int)` recorta lo que no es número sin avisar: para ids, exige solo dígitos |
+| Rate limiting | Una clave solo por IP bloquea a los demás detrás de un NAT: combina IP y cuenta |
+| Concurrencia | Leer y escribir un contador sin el mismo bloqueo pierde registros: hazlo atómico |

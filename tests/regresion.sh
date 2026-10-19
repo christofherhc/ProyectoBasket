@@ -288,39 +288,73 @@ echo
 echo "════════════════════════════════════════════════════════════"
 echo
 echo "════════════════════════════════════════════════════════════"
-echo " 13. Bloqueo de intentos: el contador NO esta en la sesion"
+echo
 echo "════════════════════════════════════════════════════════════"
-# El bloqueo es por IP, no por cookie: una sesion nueva no lo reinicia.
-# Por eso el contador vive en el servidor, en un archivo por IP dentro de la
-# carpeta temporal. Al final de la prueba se borra, para no dejar bloqueada
-# la IP de la maquina.
-for i in 1 2 3 4 5; do
-  JAR2="$(mktemp -t ck2.XXXXXX)"
-  T2=$(curl -s -c "$JAR2" -b "$JAR2" "$BASE?controller=Auth&action=index" \
-    | grep -o 'name="csrf_token" value="[a-f0-9]\{64\}"' | head -1 | grep -o '[a-f0-9]\{64\}')
-  curl -s -o /dev/null -X POST -c "$JAR2" -b "$JAR2" "$BASE?controller=Auth&action=login" \
-    -d "csrf_token=$T2&email=demo@liga.com&password=incorrecta"
-  rm -f "$JAR2"
-done
+echo " 13. Bloqueo de intentos: por IP y por cuenta"
+echo "════════════════════════════════════════════════════════════"
+# El bloqueo NO está en la sesión (el atacante dejaría de mandar la cookie)
+# ni es solo por IP (cinco fallos de una cuenta bloquearían a todas las
+# cuentas de esa IP). La clave combina IP y cuenta.
+#
+# El estado vive en el servidor, en un archivo por clave dentro de la
+# carpeta temporal. Se limpia al empezar y al terminar la suite, para no
+# dejar bloqueada a la máquina que la ejecuta.
+LOCKDIRS="$(/opt/lampp/bin/php -r 'echo sys_get_temp_dir();' 2>/dev/null || echo /tmp)/liga_basquet_login /opt/lampp/temp/liga_basquet_login"
 
-JAR3="$(mktemp -t ck3.XXXXXX)"
-T3=$(curl -s -c "$JAR3" -b "$JAR3" "$BASE?controller=Auth&action=index" \
-  | grep -o 'name="csrf_token" value="[a-f0-9]\{64\}"' | head -1 | grep -o '[a-f0-9]\{64\}')
-R=$(curl -sL -c "$JAR3" -b "$JAR3" -X POST "$BASE?controller=Auth&action=login" \
-  -d "csrf_token=$T3&email=demo@liga.com&password=password")
-contiene "  tras 5 fallos, el login correcto se bloquea" "Demasiados intentos fallidos" "$R"
-noContiene "  y no deja entrar" "Sesión iniciada" "$R"
-rm -f "$JAR3"
+limpiar_bloqueo() {
+  for d in $LOCKDIRS; do
+    rm -f "$d"/*.json 2>/dev/null
+  done
+}
 
-# Se limpia el estado para no dejar el contador bloqueado.
 limpiar_bloqueo
-JAR4="$(mktemp -t ck4.XXXXXX)"
-T4=$(curl -s -c "$JAR4" -b "$JAR4" "$BASE?controller=Auth&action=index" \
-  | grep -o 'name="csrf_token" value="[a-f0-9]\{64\}"' | head -1 | grep -o '[a-f0-9]\{64\}')
-R=$(curl -sL -c "$JAR4" -b "$JAR4" -X POST "$BASE?controller=Auth&action=login" \
-  -d "csrf_token=$T4&email=demo@liga.com&password=password")
+
+intento_fallido() {
+  # $1 = email. Devuelve el cuerpo de la respuesta.
+  local J T
+  J="$(mktemp -t ckf.XXXXXX)"
+  T=$(curl -s -c "$J" -b "$J" "$BASE?controller=Auth&action=index" \
+    | grep -o 'name="csrf_token" value="[a-f0-9]\{64\}"' | head -1 | grep -o '[a-f0-9]\{64\}')
+  curl -sL -c "$J" -b "$J" -X POST "$BASE?controller=Auth&action=login" \
+    -d "csrf_token=$T&email=$1&password=incorrecta"
+  rm -f "$J"
+}
+
+intento_correcto() {
+  # $1 = email, $2 = password. Devuelve el cuerpo de la respuesta.
+  local J T
+  J="$(mktemp -t ckc.XXXXXX)"
+  T=$(curl -s -c "$J" -b "$J" "$BASE?controller=Auth&action=index" \
+    | grep -o 'name="csrf_token" value="[a-f0-9]\{64\}"' | head -1 | grep -o '[a-f0-9]\{64\}')
+  curl -sL -c "$J" -b "$J" -X POST "$BASE?controller=Auth&action=login" \
+    -d "csrf_token=$T&email=$1&password=$2"
+  rm -f "$J"
+}
+
+# --- 1) Cinco intentos fallidos en PARALELO ---
+# Simultaneidad a propósito: el contador se lee y se escribe en disco, y
+# si la lectura no estuviera protegida se perderían intentos y el bloqueo
+# no llegaría a activarse.
+for i in 1 2 3 4 5; do
+  intento_fallido "demo@liga.com" >/dev/null &
+done
+wait
+
+R=$(intento_correcto "demo@liga.com" "password")
+contiene "  5 fallos en paralelo bloquean la cuenta" "Demasiados intentos fallidos" "$R"
+
+# --- 2) El bloqueo es POR CUENTA: otra cuenta de la misma IP entra ---
+R=$(intento_correcto "admin@liga.com" "password")
+contiene "  otra cuenta de la misma IP NO se bloquea" "Sesión iniciada" "$R"
+
+# --- 3) Y la cuenta atacada sigue bloqueada ---
+R=$(intento_correcto "demo@liga.com" "password")
+contiene "  la cuenta atacada sigue bloqueada" "Demasiados intentos fallidos" "$R"
+
+# --- 4) Al limpiar el estado, el login vuelve a funcionar ---
+limpiar_bloqueo
+R=$(intento_correcto "demo@liga.com" "password")
 contiene "  tras limpiar, el login vuelve a funcionar" "Sesión iniciada" "$R"
-rm -f "$JAR4"
 
 echo "14. Restauracion de la base de datos"
 echo "════════════════════════════════════════════════════════════"

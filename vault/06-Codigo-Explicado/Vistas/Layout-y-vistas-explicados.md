@@ -414,4 +414,4 @@ Las vistas de este proyecto son "listas para mostrar": solo imprimen. **No conti
 
 ---
 
-**Con este archivo queda explicada toda la aplicación**: config → core → modelos → controladores → vistas. Los 15 archivos de `06-Codigo-Explicado` cubren el 100% del código PHP del proyecto.
+**Con este archivo queda explicada toda la aplicación**: config → core → modelos → controladores → vistas. Los archivos de `06-Codigo-Explicado` cubren el 100% del código PHP del proyecto, incluida la clase `LimitadorIntentos`, que explica el bloqueo de intentos de login.

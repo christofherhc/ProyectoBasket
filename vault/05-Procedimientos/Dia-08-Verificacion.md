@@ -185,7 +185,7 @@ php -l app/views/partidos/index.php   # "No syntax errors" (¡pasa igual!)
 | `doc/practica_liga.md` | editar | Corregida la explicación del `datetime-local` |
 | `doc/ejemplo_documento_tecnico.md` | editar | Corregida la explicación del `datetime-local` |
 
-## 6. Explicación técnica: la suite final (12 bloques)
+## 6. Explicación técnica: la suite final (14 bloques)
 
 | # | Bloque | Pruebas | Cubre |
 |---|---|---|---|
@@ -309,9 +309,9 @@ try {
 | Módulos | 5 (auth, equipos, jugadores, partidos, estadísticas) |
 | Archivos PHP | 22 |
 | Tablas | 4, con 3 claves foráneas y un índice `UNIQUE` |
-| Pruebas funcionales | **87 / 87 superadas** |
+| Pruebas funcionales | **96 / 96 superadas** |
 | Seguridad | Prepared statements, bcrypt, escapado de salida, sesiones regeneradas, CSRF, lista blanca `RUTAS`, validación en servidor |
-| Documentación | Vault de 10 secciones, 15 archivos de código explicado, 8 procedimientos |
+| Documentación | Vault de 12 secciones, 15 archivos de código explicado, 8 procedimientos |
 | Git | Historial limpio con commits atómicos y mensajes descriptivos |
 
 **Pendiente fuera del alcance del código:**

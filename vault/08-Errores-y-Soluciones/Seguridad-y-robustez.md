@@ -4,7 +4,7 @@
 > revisión completa del código. No es un tutorial de seguridad: es el registro
 > de **qué estaba mal, por qué importaba y qué se hizo** en este proyecto.
 
-**Fecha:** octubre de 2026 · **Alcance:** `app/`, `public/`, `database/schema.sql` · **Pruebas:** `tests/regresion.sh` (81 comprobaciones)
+**Fecha:** octubre de 2026 · **Alcance:** `app/`, `public/`, `database/schema.sql` · **Pruebas:** `tests/regresion.sh` (96 comprobaciones)
 
 ---
 
@@ -330,13 +330,18 @@ LimitadorIntentos::registrarFallido($clave); // suma un intento
 LimitadorIntentos::limpiar($clave);          // login correcto: contador a cero
 ```
 
-La clave es la dirección IP del visitante:
+La clave combina la dirección IP **con la cuenta que se intenta entrar**:
 
 ```php
-private static function claveDeBloqueo(): string {
-    return (string)($_SERVER['REMOTE_ADDR'] ?? 'desconocida');
+private static function claveDeBloqueo(string $email): string {
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'desconocida');
+    return $ip . '|' . strtolower($email);
 }
 ```
+
+⚠️ **Por qué la cuenta va en la clave.** Con la IP sola, cinco fallos de una cuenta bloquearían a todas las cuentas de esa IP. En un aula o una oficina, donde muchas máquinas comparten la misma IP pública, cinco errores tipográficos de una persona dejarían fuera a todo el mundo durante 15 minutos. Con la cuenta dentro de la clave, el bloqueo solo afecta a la cuenta atacada desde esa IP: el atacante que prueba mil contraseñas sigue topándose con el mismo bloqueo, y los demás usuarios no se ven afectados.
+
+⚠️ **Y todo el ciclo leer-modificar-escribir va bajo el mismo bloqueo.** Si la lectura no está protegida, dos peticiones simultáneas se pisan y se pierden intentos: medido con 20 procesos en paralelo, la versión sin bloqueo compartido registraba 9 intentos de 1000. Eso rompía la protección entera, porque el contador nunca llegaba a cinco y el bloqueo no se activaba nunca.
 
 Cada intento fallido se guarda como una marca de tiempo en un JSON, y se cuentan solo los que caen dentro de la ventana de 15 minutos. El archivo se bloquea con `flock()` para que dos peticiones simultáneas no se pisen, y el nombre del archivo es el hash SHA-256 de la IP, para no dejar la dirección a la vista en el sistema de archivos.
 
@@ -459,12 +464,12 @@ Una auditoría también sirve para **descartar** sospechas. Estas se investaron,
 
 ## 12. Cómo se comprueba todo esto
 
-`tests/regresion.sh` ejecuta **81 comprobaciones** contra la aplicación desplegada, agrupadas en 12 bloques:
+`tests/regresion.sh` ejecuta **96 comprobaciones** contra la aplicación desplegada, agrupadas en 14 bloques:
 
 ```bash
 ./tests/regresion.sh
 # ...
-# RESULTADO: 81 correctas, 0 fallidas
+# RESULTADO: 96 correctas, 0 fallidas
 ```
 
 ⚠️ **La suite modifica la base de datos y la reinicia al terminar** desde `database/schema.sql` y `database/seeds.sql`, dejándola en 4/12/4/2. No se ejecuta contra una base con datos reales.
@@ -584,4 +589,4 @@ Nada de lo listado bloquea la entrega, pero conviene saberlo:
 
 ## Archivos relacionados
 
-`../../08-Errores-y-Soluciones/Registro-de-errores.md` (errores 16–22, la historia completa de cada fallo) · `../06-Codigo-Explicado/Core/Router-explicado.md` (lista blanca en detalle) · `../06-Codigo-Explicado/Controllers/EquiposController-explicado.md` (el borrado con FK, paso a paso) · `../06-Codigo-Explicado/Controllers/AuthController-explicado.md` (sesión y bloqueo) · `../04-BD/schema-explicado.md` (las restricciones y por qué se eligieron así) · `../../tests/regresion.sh`
+`../../08-Errores-y-Soluciones/Registro-de-errores.md` (errores 16–25, la historia completa de cada fallo) · `../06-Codigo-Explicado/Core/Router-explicado.md` (lista blanca en detalle) · `../06-Codigo-Explicado/Controllers/EquiposController-explicado.md` (el borrado con FK, paso a paso) · `../06-Codigo-Explicado/Controllers/AuthController-explicado.md` (sesión y bloqueo) · `../04-BD/schema-explicado.md` (las restricciones y por qué se eligieron así) · `../../tests/regresion.sh`

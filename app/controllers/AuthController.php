@@ -44,7 +44,7 @@ class AuthController extends Controller {
         // Bloqueo temporal tras 5 intentos fallidos en 15 minutos.
         // El contador está en el servidor, identificado por la IP: si estuviera
         // en la sesión, el atacante solo tendría que dejar de mandar la cookie.
-        if (LimitadorIntentos::estaBloqueado(self::claveDeBloqueo())) {
+        if (LimitadorIntentos::estaBloqueado(self::claveDeBloqueo($email))) {
             flashError('Demasiados intentos fallidos. Espera 15 minutos antes de volver a intentarlo.');
             redir('controller=Auth&action=index');
         }
@@ -67,12 +67,12 @@ class AuthController extends Controller {
         // oráculo de temporización vuelve a existir.
         $hash = $usuario['password'] ?? '$2y$10$b5pz5IIYg3leDdmiAxjLmePzvOSB/93Y977NnpATb5/hHY2uexpB2';
         if (!password_verify($password, $hash) || $usuario === null) {
-            LimitadorIntentos::registrarFallido(self::claveDeBloqueo());
+            LimitadorIntentos::registrarFallido(self::claveDeBloqueo($email));
             flashError('Credenciales incorrectas');
             redir('controller=Auth&action=index');
         }
 
-        LimitadorIntentos::limpiar(self::claveDeBloqueo());
+        LimitadorIntentos::limpiar(self::claveDeBloqueo($email));
 
         // Login exitoso
         session_regenerate_id(true);
@@ -162,17 +162,30 @@ class AuthController extends Controller {
     }
 
     /**
-     * Clave con la que se identifica al que intenta iniciar sesión.
+     * Clave con la que se identifica el intento de inicio de sesión.
      *
-     * Se usa la dirección IP. Ojo: si la aplicación se pone detrás de un
-     * proxy o un balanceador, REMOTE_ADDR es la del proxy y el bloqueo
-     * affectaría a todos los usuarios a la vez. En ese caso habría que
-     * usar la cabecera X-Forwarded-For, validada contra una lista blanca.
+     * Combina la dirección IP con la cuenta que se intenta entrar:
      *
+     *   - Si la clave fuera solo la IP, cinco fallos de una cuenta
+     *     bloquearían a todas las cuentas de esa IP. En un aula o una
+     *     oficina (donde muchas máquinas comparten la misma IP pública)
+     *     eso dejaría fuera a gente que no ha hecho nada malo.
+     *   - Con la cuenta dentro de la clave, el bloqueo solo afecta a la
+     *     cuenta que se está atacando desde esa IP, y el atacante que
+     *     prueba mil contraseñas contra ella sigue topándose con el
+     *     mismo bloqueo.
+     *
+     * ⚠️ Si la aplicación se pone detrás de un proxy o un balanceador,
+     * REMOTE_ADDR es la del proxy. En ese caso habría que usar la
+     * cabecera X-Forwarded-For, validada contra una lista blanca de
+     * proxies de confianza.
+     *
+     * @param string $email
      * @return string
      */
-    private static function claveDeBloqueo(): string {
-        return (string)($_SERVER['REMOTE_ADDR'] ?? 'desconocida');
+    private static function claveDeBloqueo(string $email): string {
+        $ip = (string)($_SERVER['REMOTE_ADDR'] ?? 'desconocida');
+        return $ip . '|' . strtolower($email);
     }
 
     /**
