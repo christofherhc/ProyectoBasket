@@ -96,7 +96,15 @@ class LimitadorIntentos {
             fclose($manejador);
         }
 
-        return $intentos;
+        // Se descartan los intentos que ya han salido de la ventana. Sin este
+        // filtro, estaBloqueado() seguía contando fallos antiguos y la cuenta
+        // quedaba bloqueada para siempre: modificar() limpiaba la lista, pero
+        // solo cuando se registraba otro fallo.
+        $ahora = time();
+        return array_values(array_filter(
+            $intentos,
+            static fn($t) => ($ahora - (int)$t) < self::VENTANA
+        ));
     }
 
     /**

@@ -41,6 +41,13 @@ class AuthController extends Controller {
             redir('controller=Auth&action=index');
         }
 
+        // usuarios.email es VARCHAR(150). Sin este límite, un email más largo
+        // llega al INSERT y MySQL responde con el error 1406 (pantalla 500).
+        if (!cabeEnColumna($email, MAX_EMAIL)) {
+            flashError('El email no puede superar los ' . MAX_EMAIL . ' caracteres');
+            redir('controller=Auth&action=index');
+        }
+
         // Bloqueo temporal tras 5 intentos fallidos en 15 minutos.
         // El contador está en el servidor, identificado por la IP: si estuviera
         // en la sesión, el atacante solo tendría que dejar de mandar la cookie.
@@ -76,6 +83,9 @@ class AuthController extends Controller {
 
         // Login exitoso
         session_regenerate_id(true);
+        // El token CSRF de la sesión anterior no debe sobrevivir al cambio de
+        // identidad: se genera uno nuevo en la primera página autenticada.
+        unset($_SESSION['csrf_token']);
         $_SESSION['usuario_id'] = $usuario['id'];
         $_SESSION['nombre'] = $usuario['nombre'];
         $_SESSION['email'] = $usuario['email'];
@@ -132,6 +142,11 @@ class AuthController extends Controller {
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             flashError('Email no válido');
+            redir($volver);
+        }
+
+        if (!cabeEnColumna($email, MAX_EMAIL)) {
+            flashError('El email no puede superar los ' . MAX_EMAIL . ' caracteres');
             redir($volver);
         }
 

@@ -16,6 +16,7 @@ date_default_timezone_set('America/Lima');
 // Si los cambias aquí, cámbialos también en el esquema.
 // =============================================
 define('MAX_NOMBRE', 100);       // equipos.nombre, jugadores.nombre, usuarios.nombre
+define('MAX_EMAIL', 150);        // usuarios.email (VARCHAR(150))
 define('MAX_CIUDAD', 100);       // equipos.ciudad
 define('MAX_CAMISETA', 99);      // jugadores.numero
 define('MAX_PUNTOS', 999);       // partidos.puntos_local / puntos_visitante
