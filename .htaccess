@@ -1,55 +1,61 @@
 # =============================================
-# Protección del proyecto frente a accesos directos
+# Punto de entrada único del proyecto
 # =============================================
-# Esta carpeta contiene TODO el proyecto: el código de la aplicación, los
-# scripts de la base de datos, la documentación y el historial de Git.
+# El proyecto se puede servir de dos formas:
 #
-# Solo la carpeta public/ debe ser accesible desde el navegador. Si el proyecto
-# entero está copiado dentro de htdocs (que es lo que hace la instalación por
-# defecto de XAMPP), Apache sirve también estas carpetas y cualquiera podría
-# descargar:
+#   1. DocumentRoot apuntando a public/ (VirtualHost). Es la opción recomendada
+#      y la más segura: el resto del proyecto queda fuera de la raíz web.
+#   2. Copiando la carpeta completa dentro de htdocs y entrando por
+#      http://localhost/ProyectoBasket/. En este caso este archivo redirige
+#      todas las peticiones al index.php de la raíz, que delega en
+#      public/index.php.
 #
-#   - database/seeds.sql   -> los hashes de las contraseñas de los usuarios
-#                             de prueba
-#   - .git/                -> el código fuente completo y todo el historial
-#   - vault/, doc/         -> la documentación interna del proyecto
+# En ambos casos deben quedar inaccesibles:
 #
-# La SOLUCIÓN PRINCIPAL es configurar el servidor para que la raíz web (el
-# DocumentRoot) sea la carpeta public/ y no la raíz del proyecto. Con eso,
-# este archivo ni siquiera llega a leerse.
+#   - app/                 -> código y configuración (incluye credenciales)
+#   - database/            -> esquema y hashes de las contraseñas de prueba
+#   - doc/, vault/, tests/ -> documentación y pruebas internas
+#   - .git/                -> código fuente e historial completo
 #
-# Este archivo es la RED DE SEGURIDAD para cuando esa configuración no se ha
-# hecho: bloquea todo lo que no esté bajo public/.
-#
-# Se usan dos mecanismos independientes, y cada uno por sí solo bastaría:
-#
-#   1. mod_rewrite -> devuelve 403 en cuanto la ruta no empieza por public/.
-#      Se comparan rutas RELATIVAS a esta carpeta, así que da igual cómo se
-#      llame la carpeta de instalación y aunque la ruta del servidor contenga
-#      la palabra "public".
-#
-#   2. mod_authz_core -> nega el acceso a esta carpeta y delega en
-#      public/.htaccess la autorización de la única carpeta pública.
-#
-# Requisito del servidor: el directorio debe permitir FollowSymLinks, porque
-# Apache no lee ningún .htaccess si no está activo. En la configuración por
-# defecto de XAMPP ya lo está.
+# Las reglas se comparan con rutas RELATIVAS a esta carpeta, así que el nombre
+# de la carpeta de instalación puede cambiar sin tocar nada.
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Lo que cuelgue de public/ se permite y se deja de procesar reglas.
+    # 1. Carpetas internas: prohibidas siempre (403).
+    RewriteRule ^(app|database|doc|vault|tests|\.git)(/|$) - [F,L]
+
+    # 2. Archivos ocultos (.git, .env, .htaccess...). Se deja pasar
+    #    .well-known/ porque lo usan los certificados TLS.
+    RewriteRule (^|/)\.(?!well-known/) - [F,L]
+
+    # 3. Recursos estáticos: viven en public/ pero se sirven desde la raíz,
+    #    para que las vistas funcionen igual con o sin /public/ en la URL.
+    RewriteRule ^(css|js|img|assets)/(.*)$ public/$1/$2 [L]
+
+    # 4. Acceso directo a public/: se mantiene por compatibilidad.
     RewriteRule ^public/ - [L]
 
-    # Cualquier otra cosa dentro del proyecto: prohibido (403).
-    RewriteRule ^ - [F,L]
+    # 5. Todo lo demás pasa por el front controller de la raíz.
+    RewriteRule ^index\.php$ - [L]
+    RewriteRule ^ index.php [L]
 </IfModule>
 
-# Red de seguridad para servidores sin mod_rewrite.
-<IfModule mod_authz_core.c>
-    Require all denied
+# Sin mod_rewrite no se puede garantizar que solo se sirva index.php.
+<IfModule !mod_rewrite.c>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
 </IfModule>
-<IfModule !mod_authz_core.c>
-    Order allow,deny
-    Deny from all
+
+# Evita que Apache liste el contenido de una carpeta sin index.
+Options -Indexes
+
+# Documentación, scripts y volcados que no deben descargarse aunque estén
+# en la raíz del proyecto.
+<IfModule mod_authz_core.c>
+    <FilesMatch "\.(md|sql|sh|pdf|log|ini|yml|yaml|json|lock|bak|old|dist)$">
+        Require all denied
+    </FilesMatch>
 </IfModule>

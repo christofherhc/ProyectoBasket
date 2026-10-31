@@ -1,19 +1,22 @@
 # =============================================
-# Carpeta public/ - ÚNICA carpeta con acceso web
+# Carpeta public/ - recursos públicos
 # =============================================
-# Esta es la carpeta que debe ser la raíz web del servidor (DocumentRoot) o la
-# única enlazada con un Alias. Aquí se permite todo, porque es el punto de
-# entrada público de la aplicación.
+# Esta carpeta puede ser la raíz web del servidor (DocumentRoot) o servirse a
+# través del index.php de la raíz del proyecto. Aquí se permite el acceso,
+# porque es el punto de entrada público de la aplicación.
 #
-# El .htaccess de la raíz del proyecto bloquea el acceso a todo lo demás
-# (app/, database/, vault/, doc/, .git/...). Este archivo es la contraparte:
-# vuelve a permitir el acceso dentro de public/, que es la única carpeta que
-# debe quedar expuesta.
+# El .htaccess de la raíz del proyecto bloquea app/, database/, doc/, vault/,
+# tests/ y .git/. Este archivo es la contraparte: vuelve a permitir el acceso
+# dentro de public/.
+
+# Si public/ es el DocumentRoot, la raíz del proyecto no se lee y este archivo
+# es el único que impide listar directorios.
+Options -Indexes
 
 <IfModule mod_authz_core.c>
     Require all granted
 </IfModule>
 <IfModule !mod_authz_core.c>
-    Order allow,granted
+    Order allow,deny
     Allow from all
 </IfModule>

@@ -45,10 +45,16 @@ existe, el cliente falla con `ERROR 1049: Unknown database 'liga_basquet'`
 ## 4. Acceder a la aplicación
 
 ```text
-http://localhost/ProyectoBasket/public/
+http://localhost/ProyectoBasket/
 ```
 
 Sustituye `ProyectoBasket` por el nombre real de la carpeta si la renombraste.
+El `index.php` de la raíz delega en `public/index.php`, así que no hace falta
+escribir `/public/` en la URL. La ruta antigua también sigue funcionando:
+
+```text
+http://localhost/ProyectoBasket/public/
+```
 
 ### Alternativa recomendada: VirtualHost (URLs limpias)
 
@@ -64,26 +70,28 @@ subcarpeta, edita `httpd-vhosts.conf` y añade:
 
 Reinicia Apache y entra en `http://ligabasquet.local/`.
 
-## 5. ⚠️ Por qué solo se sirve `public/`
+## 5. ⚠️ Qué queda accesible desde el navegador
 
 El proyecto contiene, además del código, los scripts de la base de datos, la
-documentación interna y el historial de Git. **Solo `public/` debe ser accesible
-desde el navegador.**
+documentación interna y el historial de Git. **Solo el front controller y los
+recursos de `public/` deben ser accesibles.**
 
 Para que no dependas de la configuración del servidor, el proyecto incluye dos
 archivos `.htaccess` que ya lo garantizan:
 
 | Archivo | Qué hace |
 |---|---|
-| `.htaccess` (raíz) | Devuelve **403** a cualquier petición que no sea de `public/` |
-| `public/.htaccess` | Vuelve a permitir el acceso dentro de `public/` |
+| `.htaccess` (raíz) | Pasa las peticiones a `index.php` y devuelve **403** para `app/`, `database/`, `doc/`, `vault/`, `tests/` y `.git/` |
+| `public/.htaccess` | Vuelve a permitir el acceso dentro de `public/` e impide listar directorios |
 
-Comprobado con Apache 2.4 en los tres casos habituales:
+Comprobado con Apache 2.4 en los casos habituales:
 
 | Petición | Resultado |
 |---|---|
-| `/ProyectoBasket/public/index.php` | 200 (la aplicación) |
-| `/ProyectoBasket/public/css/styles.css` | 200 (los estilos) |
+| `/ProyectoBasket/` | 200 (la aplicación) |
+| `/ProyectoBasket/index.php` | 200 (front controller de la raíz) |
+| `/ProyectoBasket/public/index.php` | 200 (front controller original) |
+| `/ProyectoBasket/css/styles.css` | 200 (los estilos) |
 | `/ProyectoBasket/database/seeds.sql` | **403** (hashes de las contraseñas de prueba) |
 | `/ProyectoBasket/.git/config` | **403** (código fuente e historial) |
 | `/ProyectoBasket/README.md` | **403** (documentación interna) |
@@ -106,5 +114,7 @@ Si importaste `seeds.sql`:
 
 ## 8. Si el CSS no carga
 
-Verifica que entras por `.../public/` y que Apache está activo.
-La URL base es dinámica: se calcula con el nombre real de la carpeta.
+Verifica que Apache está activo y que `mod_rewrite` está habilitado (en XAMPP
+lo está por defecto). La URL base es dinámica: se calcula con el nombre real de
+la carpeta, y el `.htaccess` de la raíz sirve `public/css/` también desde la
+URL sin `/public/`.

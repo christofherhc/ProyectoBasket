@@ -21,7 +21,8 @@ Este proyecto está diseñado para aprender desarrollo web paso a paso:
 
 ```text
 ProyectoBasket/
-├── .htaccess                    # Bloquea el acceso a todo el proyecto salvo public/
+├── .htaccess                    # Enruta a index.php y bloquea las carpetas internas
+├── index.php                    # Entrada desde la raíz (delega en public/index.php)
 ├── app/
 │   ├── config/config.php        # Configuración de BD y rutas
 │   ├── core/                    # Clases base (Database, Model, Controller, Router, LimitadorIntentos) y helpers
@@ -58,9 +59,10 @@ ProyectoBasket/
 
    Editar `app/config/config.php` si es necesario (usuario/contraseña/host/nombre BD). Por defecto para XAMPP: `root`, contraseña vacía, BD `liga_basquet`.
 
-4. **Apuntar el servidor a `public/` (importante)**
+4. **Elegir cómo servir la aplicación**
 
-   La carpeta `public/` es la **única** que debe quedar accesible desde el navegador. Hay dos formas de hacerlo:
+   La carpeta `public/` contiene el front controller y los recursos públicos.
+   Hay dos formas de servirla:
 
    - **Con un VirtualHost** (lo recomendado, URLs limpias):
 
@@ -71,14 +73,20 @@ ProyectoBasket/
      </VirtualHost>
      ```
 
-   - **Sin tocar la configuración**, dejando el proyecto dentro de `htdocs/` y entrando por `.../public/`. En este caso el archivo `.htaccess` de la raíz del proyecto se encarga de bloquear `app/`, `database/`, `doc/`, `vault/` y `.git/`, de modo que solo se sirva `public/`.
+   - **Sin tocar la configuración**, dejando el proyecto completo dentro de
+     `htdocs/` y entrando por `http://localhost/ProyectoBasket/`. El `index.php`
+     de la raíz delega en `public/index.php`, y el `.htaccess` de la raíz
+     bloquea `app/`, `database/`, `doc/`, `vault/`, `tests/` y `.git/`.
 
-   ⚠️ **Por qué importa:** si el proyecto entero queda bajo el DocumentRoot sin el `.htaccess`, cualquiera podría descargar `database/seeds.sql` (con los hashes de las contraseñas de prueba) y el código fuente completo desde `.git/`.
+   ⚠️ **Por qué importa:** si el proyecto entero queda bajo el DocumentRoot sin
+   el `.htaccess`, cualquiera podría descargar `database/seeds.sql` (con los
+   hashes de las contraseñas de prueba) y el código fuente completo desde `.git/`.
 
 5. **Ejecutar**
 
    Con VirtualHost: `http://ligabasquet.local/`.
-   Sin él: `http://localhost/ProyectoBasket/public/`.
+   Sin él: `http://localhost/ProyectoBasket/`.
+   La ruta con `/public/` también sigue funcionando.
 
 ## Flujo de desarrollo (Git)
 
@@ -88,7 +96,7 @@ ProyectoBasket/
   - `fix/seguridad-auth` — el bloqueo de intentos de login pasa a ser por IP
   - `fix/robustez-datos` — ids estrictos, claves foráneas recuperables, escapado unificado
 - Commits frecuentes, atómicos y con mensajes descriptivos (tipo convencional: `feat:`, `fix:`, `docs:`, `test:`)
-- Cada bloque de trabajo lleva sus propias pruebas en `tests/regresion.sh` (95 comprobaciones)
+- Cada bloque de trabajo lleva sus propias pruebas en `tests/regresion.sh` (97 comprobaciones)
 
 ### Publicar en GitHub
 
