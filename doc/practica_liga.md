@@ -1,12 +1,12 @@
 # Documento Técnico: Gestión de Liga de Básquetbol (PHP MVC)
 
-- **Extensión:** 599 palabras (requisito: entre 500 y 800)
+- **Extensión:** 718 palabras de prosa (requisito: entre 500 y 800)
 - **Autor:** Proyecto de Aprendizaje
-- **Fecha:** 2026-10-04
+- **Última actualización:** 2026-10-30
 
 ## 1. Arquitectura
 
-El sistema implementa una arquitectura **MVC ligero** en PHP vanilla, sin frameworks ni gestor de dependencias. Toda petición entra por un único punto: `public/index.php`, que actúa como **Front Controller** e inicializa sesión, cookies y manejador global de errores antes de delegar. `app/core/Router.php` interpreta `controller`, `action` y parámetros de la URL, y los valida contra una lista blanca declarada en la constante `RUTAS`. Las capas son: **Modelos** (datos y reglas de negocio), **Vistas** (plantillas PHP con layout compartido), **Controladores** (coordinación), **Core** (clases base reutilizables) y **Config** (constantes). Solo la carpeta `public/` es accesible desde el navegador: los archivos `.htaccess` de la raíz y de `public/` devuelven 403 a cualquier petición ajena a esa carpeta, de modo que ni los scripts SQL con los hashes de las contraseñas de prueba ni el historial de Git quedan descargables.
+El sistema implementa una arquitectura **MVC ligero** en PHP vanilla, sin frameworks ni gestor de dependencias. Toda petición entra por un único front controller, `public/index.php`, que inicializa sesión, cookies y manejador global de errores antes de delegar; el `index.php` de la raíz solo lo incluye para permitir entrar sin escribir `/public/`. `app/core/Router.php` interpreta `controller`, `action` y parámetros de la URL, y los valida contra una lista blanca declarada en la constante `RUTAS`. Las capas son: **Modelos** (datos y reglas de negocio), **Vistas** (plantillas PHP con layout compartido), **Controladores** (coordinación), **Core** (clases base reutilizables) y **Config** (constantes). La raíz del proyecto expone únicamente `index.php` y los recursos de `public/`: el `.htaccess` raíz reescribe las peticiones al front controller y devuelve 403 para `app/`, `database/`, `doc/`, `vault/`, `tests/` y `.git/`, de modo que ni los scripts SQL con los hashes de las contraseñas de prueba ni el historial de Git quedan descargables.
 
 ## 2. Componentes Clave
 
@@ -47,6 +47,6 @@ Dos detalles merecen mención: `DateTime::createFromFormat()` acepta fechas inex
 
 ## 6. Decisiones de Diseño
 
-Se eligió PHP vanilla para comprender los mecanismos sin abstracciones ocultas, y una lista blanca en el enrutador por seguridad: sólo se cargan los módulos declarados en ella. `posicion` es texto validado contra un catálogo en lugar de `ENUM`, para admitir valores nuevos sin alterar el esquema. La contraseña se almacena con el hash por defecto de PHP y las sesiones exigen cookies `HttpOnly`, `SameSite` y `Secure` bajo HTTPS. El despliegue se resuelve en dos capas: apuntar el `DocumentRoot` del servidor a `public/` y, como red de seguridad, los `.htaccess` que bloquean el resto del proyecto aunque la configuración del servidor cambie. El historial Git se mantiene con commits atómicos y mensajes descriptivos, y cada bloque de trabajo se desarrolla en su propia rama, que se integra en `main` con un commit de fusión. Una suite de 97 comprobaciones automatizadas verifica el comportamiento y restaura los datos de prueba al terminar.
+Se eligió PHP vanilla para comprender los mecanismos sin abstracciones ocultas, y una lista blanca en el enrutador por seguridad: sólo se cargan los módulos declarados en ella. `posicion` es texto validado contra un catálogo en lugar de `ENUM`, para admitir valores nuevos sin alterar el esquema. La contraseña se almacena con el hash por defecto de PHP y las sesiones exigen cookies `HttpOnly`, `SameSite` y `Secure` bajo HTTPS. El despliegue admite dos formas: apuntar el `DocumentRoot` a `public/` (la más segura) o copiar la carpeta completa en `htdocs/` y entrar por su raíz, donde `index.php` delega en `public/index.php` y el `.htaccess` bloquea el resto del proyecto. El historial Git se mantiene con commits atómicos y mensajes descriptivos, y cada bloque de trabajo se desarrolla en su propia rama, que se integra en `main` con un commit de fusión. Una suite de 97 comprobaciones automatizadas verifica el comportamiento y restaura los datos de prueba al terminar.
 
 Cumplen los requerimientos: los cinco módulos funcionales, control de versiones con commits atómicos, este documento en `/doc/practica_liga.md` e historial `.git` intacto en el paquete de entrega.

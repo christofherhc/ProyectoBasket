@@ -3,7 +3,8 @@
 # Comprueba que los errores documentados en la auditoría ya no se reproducen.
 #
 # Uso:  ./tests/regresion.sh [URL_BASE]
-# Por defecto: http://localhost/ProyectoBasket-Deploy/public/index.php
+# Por defecto: http://localhost/ProyectoBasket-Deploy/
+# También acepta la entrada antigua: .../ProyectoBasket-Deploy/public/index.php
 #
 # Requisitos: la aplicación desplegada en htdocs y MySQL/MariaDB arrancados.
 #
@@ -12,7 +13,7 @@
 # ejecutes contra una base con datos reales.
 set -u
 
-BASE="${1:-http://localhost/ProyectoBasket-Deploy/public/index.php}"
+BASE="${1:-http://localhost/ProyectoBasket-Deploy/}"
 JAR="$(mktemp -t ck.XXXXXX)"
 PASS=0
 FAIL=0
@@ -188,7 +189,7 @@ LOC=$(curl -s -o /dev/null -w '%{redirect_url}' -H 'Host: evil.example.com' \
   "$BASE?controller=Equipos&action=index")
 noContiene "Location sin host ajeno" "evil.example.com" "$LOC"
 contiene "Location conserva el host legitimo" "localhost" "$LOC"
-contiene "Location lleva a la ruta de la app" "/public/" "$LOC"
+contiene "Location lleva a la ruta de la app" "controller=Auth" "$LOC"
 
 echo
 echo "════════════════════════════════════════════════════════════"
@@ -409,30 +410,51 @@ intento_correcto() {
   rm -f "$J"
 }
 
+# Crea una cuenta nueva para las pruebas del limitador. Se usa un sufijo
+# distinto en cada ejecucion para no chocar con una cuenta que haya quedado
+# de una ejecucion anterior.
+registrar_usuario() {
+  local email="$1" password="$2" J T
+  J="$(mktemp -t ckr.XXXXXX)"
+  T=$(curl -s -c "$J" -b "$J" "$BASE?controller=Auth&action=register" \
+    | grep -o 'name="csrf_token" value="[a-f0-9]\{64\}"' | head -1 | grep -o '[a-f0-9]\{64\}')
+  curl -sL -c "$J" -b "$J" -X POST "$BASE?controller=Auth&action=guardarRegistro" \
+    -d "csrf_token=$T&nombre=Suite&email=$email&password=$password&confirmar=$password" >/dev/null
+  rm -f "$J"
+}
+
+SUFIJO="$(date +%s)-$$"
+CUENTA_ATACADA="bloqueo1-$SUFIJO@liga.com"
+CUENTA_SANA="bloqueo2-$SUFIJO@liga.com"
+registrar_usuario "$CUENTA_ATACADA" "Password1"
+registrar_usuario "$CUENTA_SANA" "Password1"
+
 # --- 1) Cinco intentos fallidos en PARALELO ---
 # Simultaneidad a propósito: el contador se lee y se escribe en disco, y
 # si la lectura no estuviera protegida se perderían intentos y el bloqueo
 # no llegaría a activarse.
 for i in 1 2 3 4 5; do
-  intento_fallido "demo@liga.com" >/dev/null &
+  intento_fallido "$CUENTA_ATACADA" >/dev/null &
 done
 wait
 
-R=$(intento_correcto "demo@liga.com" "password")
+R=$(intento_correcto "$CUENTA_ATACADA" "Password1")
 contiene "  5 fallos en paralelo bloquean la cuenta" "Demasiados intentos fallidos" "$R"
 
 # --- 2) El bloqueo es POR CUENTA: otra cuenta de la misma IP entra ---
-R=$(intento_correcto "admin@liga.com" "password")
+R=$(intento_correcto "$CUENTA_SANA" "Password1")
 contiene "  otra cuenta de la misma IP NO se bloquea" "Sesión iniciada" "$R"
 
 # --- 3) Y la cuenta atacada sigue bloqueada ---
-R=$(intento_correcto "demo@liga.com" "password")
+R=$(intento_correcto "$CUENTA_ATACADA" "Password1")
 contiene "  la cuenta atacada sigue bloqueada" "Demasiados intentos fallidos" "$R"
 
-# --- 4) Al limpiar el estado, el login vuelve a funcionar ---
-limpiar_bloqueo
-R=$(intento_correcto "demo@liga.com" "password")
-contiene "  tras limpiar, el login vuelve a funcionar" "Sesión iniciada" "$R"
+# --- 4) Cuatro fallos no bloquean y un login correcto reinicia el contador ---
+for i in 1 2 3 4; do
+  intento_fallido "$CUENTA_SANA" >/dev/null
+done
+R=$(intento_correcto "$CUENTA_SANA" "Password1")
+contiene "  4 fallos no bloquean y el login correcto limpia" "Sesión iniciada" "$R"
 
 echo "14. Restauracion de la base de datos"
 echo "════════════════════════════════════════════════════════════"
