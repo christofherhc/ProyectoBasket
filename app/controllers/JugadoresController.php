@@ -63,6 +63,7 @@ class JugadoresController extends Controller {
         $id = enteroPositivo($params['id'] ?? '') ?? 0;
         $jugador = $this->jugadorModel->obtenerPorId($id);
         if ($jugador === null) {
+            unset($_SESSION['old_jugador']);
             flashError('Jugador no encontrado');
             redir('controller=Jugadores&action=index');
         }
@@ -147,7 +148,7 @@ class JugadoresController extends Controller {
         $nombre    = trim(post('nombre'));
         $numero    = trim(post('numero'));
         $posicion  = trim(post('posicion'));
-        $equipoId  = (int)post('equipo_id', '0');
+        $equipoId  = enteroPositivo(post('equipo_id')) ?? 0;
 
         $_SESSION['old_jugador'] = [
             'nombre'    => $nombre,

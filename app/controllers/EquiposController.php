@@ -52,6 +52,9 @@ class EquiposController extends Controller {
         $id = enteroPositivo($params['id'] ?? '') ?? 0;
         $equipo = $this->equipoModel->obtenerPorId($id);
         if ($equipo === null) {
+            // No dejar valores de un formulario anterior: si no se limpian,
+            // el siguiente "crear" aparecería relleno con datos ajenos.
+            unset($_SESSION['old_equipo']);
             flashError('Equipo no encontrado');
             redir('controller=Equipos&action=index');
         }

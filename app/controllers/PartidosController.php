@@ -64,6 +64,7 @@ class PartidosController extends Controller {
         $id = enteroPositivo($params['id'] ?? '') ?? 0;
         $partido = $this->partidoModel->obtenerPorId($id);
         if ($partido === null) {
+            unset($_SESSION['old_partido']);
             flashError('Partido no encontrado');
             redir('controller=Partidos&action=index');
         }
