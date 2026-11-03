@@ -3,7 +3,7 @@
 > **Modalidad:** Individual  
 > **Proyecto:** Práctica Calificada 1  
 > **Repositorio:** GitHub  
-> **Autor:** [Nombre del Estudiante]
+> **Autor:** Christofher HUrtado Castillo
 
 ## Índice
 
@@ -14,7 +14,6 @@
 5. [Código Fuente: Explicación y Fragmentos Relevantes](#5-código-fuente-explicación-y-fragmentos-relevantes)
 6. [Resolución de Problemas](#6-resolución-de-problemas)
 7. [Decisiones de Diseño](#7-decisiones-de-diseño)
-8. [Conclusiones](#8-conclusiones)
 
 ## 1. Introducción
 
@@ -163,9 +162,3 @@ protected function requiereLogin(): void {
 | **LEFT JOIN en listados** | Más robusto ante posibles datos inconsistentes, evita pérdida de información en visualización. |
 | **Controladores delgados / Modelos con lógica BD** | Respeta separación MVC: SQL y relaciones en Modelo, coordinación en Controlador, presentación en Vista. |
 | **Git: commits atómicos + ramas por funcionalidad** | Cumple requisito de avance progresivo. Historial claro, trazable y profesional. |
-
-## 8. Conclusiones
-
-El desarrollo del proyecto permitió aplicar de manera práctica los conceptos de arquitectura MVC, acceso seguro a bases de datos con PDO, autenticación segura y control de versiones con Git. El enfoque **sencillo, legible y explícito** favorece la comprensión del código (alineado con el objetivo de aprender leyendo código ajeno).
-
-Se cumplieron todos los módulos funcionales solicitados, se aplicaron buenas prácticas de seguridad (prepared statements, hash de contraseñas, escape de salida, protección de rutas) y se documentó técnicamente el proceso, dificultades y decisiones de diseño. El resultado es una aplicación funcional, ordenada y mantenible, con un historial de Git que evidencia desarrollo progresivo y organizado a lo largo del tiempo.
